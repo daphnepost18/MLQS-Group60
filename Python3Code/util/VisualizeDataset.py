@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 import dateutil
 import matplotlib as mpl
-mpl.use('tkagg')
+mpl.use('Agg')
 
 class VisualizeDataset:
 
