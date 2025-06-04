@@ -50,7 +50,7 @@ for milliseconds_per_instance in GRANULARITIES:
     dataset.add_event_dataset_with_unit('Labels.csv', 'label_start', 'label_end', 'label', 'binary', timestamp_unit='s')
     dataset.add_numerical_dataset_with_unit('Magnetometer.csv', "Time (s)", ["X (µT)", "Y (µT)", "Z (µT)"], 'avg',
                                             'mag_', timestamp_unit='s')
-    dataset.add_numerical_dataset_with_unit('Barometer.csv', "Time (s)", ["X (hPa)"], 'avg', 'press_',
+    dataset.add_numerical_dataset_with_unit('Barometer.csv', "Time (s)", ["X (hPa)"], 'avg', 'bar_',
                                             timestamp_unit='s')
 
     # Get the resulting pandas data table
@@ -63,7 +63,7 @@ for milliseconds_per_instance in GRANULARITIES:
     DataViz.plot_dataset_boxplot(dataset, ['acc_X (m/s^2)','acc_Y (m/s^2)','acc_Z (m/s^2)'])
 
     # Plot all data
-    DataViz.plot_dataset(dataset, ['acc_', 'gyr_', 'mag_', 'press_', 'label'],
+    DataViz.plot_dataset(dataset, ['acc_', 'gyr_', 'mag_', 'bar_', 'label'],
                                   ['like', 'like', 'like', 'like', 'like'],
                                   ['line', 'line', 'line', 'line', 'points'])
 
