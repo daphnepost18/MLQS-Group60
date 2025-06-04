@@ -40,25 +40,18 @@ for milliseconds_per_instance in GRANULARITIES:
 
     # Add the selected measurements to it.
 
-    # We add the accelerometer data (continuous numerical measurements) of the phone and the smartwatch
-    # and aggregate the values per timestep by averaging the values
-    dataset.add_numerical_dataset('Accelerometer.csv', "Time (s)", ["X (m/s^2)","Y (m/s^2)","Z (m/s^2)"], 'avg', 'acc_')
+    # In bouldering_ch2.py, modify the dataset.add_... calls:
 
-    # We add the gyroscope data (continuous numerical measurements) of the phone and the smartwatch
-    # and aggregate the values per timestep by averaging the values
-    dataset.add_numerical_dataset('Gyroscope.csv', "Time (s)", ["X (rad/s)","Y (rad/s)","Z (rad/s)"], 'avg', 'gyr_')
-
-    # We add the labels provided by the users. These are categorical events that might overlap. We add them
-    # as binary attributes (i.e. add a one to the attribute representing the specific value for the label if it
-    # occurs within an interval).
-    dataset.add_event_dataset('Labels.csv', 'label_start', 'label_end', 'label', 'binary')
-
-    # We add the magnetometer data (continuous numerical measurements) of the phone and the smartwatch
-    # and aggregate the values per timestep by averaging the values
-    dataset.add_numerical_dataset('Magnetometer.csv', "Time (s)", ["X (µT)","Y (µT)","Z (µT)"], 'avg', 'mag_')
-
-    # We add the pressure sensed by the phone (continuous numerical measurements) and aggregate by averaging again
-    dataset.add_numerical_dataset('Barometer.csv', "Time (s)", ["X (hPa)"], 'avg', 'press_')
+    # Replace with the new methods and specify unit='s'
+    dataset.add_numerical_dataset_with_unit('Accelerometer.csv', "Time (s)", ["X (m/s^2)", "Y (m/s^2)", "Z (m/s^2)"],
+                                            'avg', 'acc_', timestamp_unit='s')
+    dataset.add_numerical_dataset_with_unit('Gyroscope.csv', "Time (s)", ["X (rad/s)", "Y (rad/s)", "Z (rad/s)"], 'avg',
+                                            'gyr_', timestamp_unit='s')
+    dataset.add_event_dataset_with_unit('Labels.csv', 'label_start', 'label_end', 'label', 'binary', timestamp_unit='s')
+    dataset.add_numerical_dataset_with_unit('Magnetometer.csv', "Time (s)", ["X (µT)", "Y (µT)", "Z (µT)"], 'avg',
+                                            'mag_', timestamp_unit='s')
+    dataset.add_numerical_dataset_with_unit('Barometer.csv', "Time (s)", ["X (hPa)"], 'avg', 'press_',
+                                            timestamp_unit='s')
 
     # Get the resulting pandas data table
     dataset = dataset.data_table
