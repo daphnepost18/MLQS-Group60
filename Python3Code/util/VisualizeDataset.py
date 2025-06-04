@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 import dateutil
 import matplotlib as mpl
-mpl.use('tkagg')
+mpl.use('Agg')
 
 class VisualizeDataset:
 
@@ -136,7 +136,7 @@ class VisualizeDataset:
 
     def plot_dataset_boxplot(self, dataset, cols):
         plt.Figure(); dataset[cols].plot.box()
-        plt.ylim([-30,30])
+        #plt.ylim([-30,30])
         self.save(plt)
         plt.show()
 

@@ -126,3 +126,85 @@ class CreateDataset:
             relevant_dataset_cols.extend([col for col in cols if id in col])
 
         return relevant_dataset_cols
+
+    # Add numerical data, with an explicit timestamp unit
+    def add_numerical_dataset_with_unit(self, file, timestamp_col, value_cols, aggregation='avg', prefix='', timestamp_unit=None):
+        print(f'Reading data from {file}')
+        dataset = pd.read_csv(self.base_dir / file, skipinitialspace=True)
+
+        # Convert timestamps to dates, using the specified unit
+        if timestamp_unit:
+            dataset[timestamp_col] = pd.to_datetime(dataset[timestamp_col], unit=timestamp_unit)
+        else:
+            dataset[timestamp_col] = pd.to_datetime(dataset[timestamp_col])
+
+        # Create a table based on the times found in the dataset
+        if self.data_table is None:
+            self.create_dataset(min(dataset[timestamp_col]), max(dataset[timestamp_col]), value_cols, prefix)
+        else:
+            for col in value_cols:
+                self.data_table[str(prefix) + str(col)] = np.nan
+
+        # Over all rows in the new table
+        for i in range(0, len(self.data_table.index)):
+            # Select the relevant measurements.
+            relevant_rows = dataset[
+                (dataset[timestamp_col] >= self.data_table.index[i]) &
+                (dataset[timestamp_col] < (self.data_table.index[i] +
+                                           timedelta(milliseconds=self.granularity)))
+            ]
+            for col in value_cols:
+                # Take the average value
+                if len(relevant_rows) > 0:
+                    if aggregation == 'avg':
+                        self.data_table.loc[self.data_table.index[i], str(prefix)+str(col)] = np.average(relevant_rows[col])
+                    else:
+                        raise ValueError(f"Unknown aggregation {aggregation}")
+                else:
+                    self.data_table.loc[self.data_table.index[i], str(prefix)+str(col)] = np.nan
+
+    # Add event data, with an explicit timestamp unit
+    def add_event_dataset_with_unit(self, file, start_timestamp_col, end_timestamp_col, value_col, aggregation='sum', timestamp_unit=None):
+        print(f'Reading data from {file}')
+        dataset = pd.read_csv(self.base_dir / file)
+
+        # Convert timestamps to datetime, using the specified unit.
+        if timestamp_unit:
+            dataset[start_timestamp_col] = pd.to_datetime(dataset[start_timestamp_col], unit=timestamp_unit)
+            dataset[end_timestamp_col] = pd.to_datetime(dataset[end_timestamp_col], unit=timestamp_unit)
+        else:
+            dataset[start_timestamp_col] = pd.to_datetime(dataset[start_timestamp_col])
+            dataset[end_timestamp_col] = pd.to_datetime(dataset[end_timestamp_col])
+
+
+        # Clean the event values in the dataset
+        dataset[value_col] = dataset[value_col].apply(self.clean_name)
+        event_values = dataset[value_col].unique()
+
+        # Add columns for all possible values (or create a new dataset if empty), set the default to 0 occurrences
+        if self.data_table is None:
+            self.create_dataset(min(dataset[start_timestamp_col]), max(dataset[end_timestamp_col]), event_values, value_col)
+        for col in event_values:
+            self.data_table[(str(value_col) + str(col))] = 0
+
+        # Now we need to start counting by passing along the rows....
+        for i in range(0, len(dataset.index)):
+            # identify the time points of the row in our dataset and the value
+            start = dataset[start_timestamp_col][i]
+            end = dataset[end_timestamp_col][i]
+            value = dataset[value_col][i]
+            border = (start - timedelta(milliseconds=self.granularity))
+
+            # get the right rows from our data table
+            relevant_rows = self.data_table[(start <= (self.data_table.index +timedelta(milliseconds=self.granularity))) & (end > self.data_table.index)]
+
+            # and add 1 to the rows if we take the sum
+            if aggregation == 'sum':
+                self.data_table.loc[relevant_rows.index, str(value_col) + str(value)] += 1
+            # or set to 1 if we just want to know it happened
+            elif aggregation == 'binary':
+                self.data_table.loc[relevant_rows.index, str(value_col) + str(value)] = 1
+            else:
+                raise ValueError("Unknown aggregation '" + aggregation + "'")
+
+
