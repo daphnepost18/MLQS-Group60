@@ -71,7 +71,7 @@ def main():
                                     imputed_interpolation_dataset['acc_X (m/s^2)'])
 
     elif FLAGS.mode == 'kalman':
-        # Using the result from Chapter 2, let us try the Kalman filter on the light_phone_lux attribute and study the result.
+        # Using the result from Chapter 2, let us try the Kalman filter on the attribute and study the result.
         try:
             original_dataset = pd.read_csv(
                 DATA_PATH / ORIG_DATASET_FNAME, index_col=0)
@@ -109,8 +109,7 @@ def main():
         for col in [c for c in dataset.columns if not 'label' in c]:
             dataset = MisVal.impute_interpolate(dataset, col)
 
-        selected_predictor_cols = [c for c in dataset.columns if (
-            not ('label' in c)) and (not (c == 'hr_watch_rate'))]
+        selected_predictor_cols = [c for c in dataset.columns if not ('label' in c)]
         pc_values = PCA.determine_pc_explained_variance(
             dataset, selected_predictor_cols)
 
@@ -156,11 +155,22 @@ def main():
 
         # We used the optimal found parameter n_pcs = 7, to apply PCA to the final dataset
 
-        selected_predictor_cols = [c for c in dataset.columns if (not ('label' in c)) and (not (c == 'hr_watch_rate'))]
+        selected_predictor_cols = [c for c in dataset.columns if not ('label' in c)]
 
         n_pcs = 7
 
         dataset = PCA.apply_pca(copy.deepcopy(dataset), selected_predictor_cols, n_pcs)
+
+        print("--- Dataset head before plotting ---")
+        print(dataset.head())
+        print("\n--- NaN counts per column before plotting ---")
+        print(dataset.isnull().sum())
+        # You might also want to check the specific columns you are trying to plot
+        print("\n--- Min/Max of plotting columns ---")
+        for col_group in ['acc_', 'gyr_', 'mag_', 'press_']:
+            relevant_cols = [c for c in dataset.columns if c.startswith(col_group)]
+            for col in relevant_cols:
+                print(f"{col}: Min={dataset[col].min()}, Max={dataset[col].max()}")
 
         # And the overall final dataset:
         DataViz.plot_dataset(dataset,
