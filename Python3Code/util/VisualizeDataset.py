@@ -135,10 +135,10 @@ class VisualizeDataset:
         self.save(plt)
         plt.show()
 
-    def plot_dataset_boxplot(self, dataset, cols):
+    def plot_dataset_boxplot(self, dataset, cols, prefix=None):
         plt.Figure(); dataset[cols].plot.box()
         #plt.ylim([-30,30])
-        self.save(plt)
+        self.save(plt, prefix=prefix)
         plt.show()
 
     # This function plots the real and imaginary amplitudes of the frequencies found in the Fourier transformation.
