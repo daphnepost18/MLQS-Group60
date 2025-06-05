@@ -50,9 +50,7 @@ for milliseconds_per_instance in GRANULARITIES:
     dataset.add_event_dataset_with_unit('Labels.csv', 'label_start', 'label_end', 'label', 'binary', timestamp_unit='s')
     dataset.add_numerical_dataset_with_unit('Magnetometer.csv', "Time (s)", ["X (µT)", "Y (µT)", "Z (µT)"], 'avg',
                                             'mag_', timestamp_unit='s')
-    dataset.add_numerical_dataset_with_unit('Barometer.csv', "Time (s)", ["X (hPa)"], 'avg', 'bar_',
-                                            timestamp_unit='s')
-    dataset.add_numerical_dataset_with_unit('Location.csv', "Time (s)", ["Height (m)","Velocity (m/s)","Direction (°)"], 'avg', 'loc_',
+    dataset.add_numerical_dataset_with_unit('Location.csv', "Time (s)", ["Height (m)","Velocity (m/s)"], 'avg', 'loc_',
                                             timestamp_unit='s')
 
     # Get the resulting pandas data table
@@ -63,11 +61,14 @@ for milliseconds_per_instance in GRANULARITIES:
 
     # Boxplot
     DataViz.plot_dataset_boxplot(dataset, ['acc_X (m/s^2)','acc_Y (m/s^2)','acc_Z (m/s^2)'])
+    DataViz.plot_dataset_boxplot(dataset, ["gyr_X (rad/s)","gyr_Y (rad/s)","gyr_Z (rad/s)"])
+    DataViz.plot_dataset_boxplot(dataset, ["mag_X (µT)", "mag_Y (µT)", "mag_Z (µT)"])
+    DataViz.plot_dataset_boxplot(dataset, ["loc_Height (m)","loc_Velocity (m/s)"])
 
     # Plot all data
-    DataViz.plot_dataset(dataset, ['acc_', 'gyr_', 'mag_', 'bar_', 'loc_', 'label'],
-                                  ['like', 'like', 'like', 'like', 'like', 'like'],
-                                  ['line', 'line', 'line', 'line', 'line', 'points'])
+    DataViz.plot_dataset(dataset, ['acc_', 'gyr_', 'mag_', 'loc_', 'label'],
+                                  ['like', 'like', 'like', 'like', 'like'],
+                                  ['line', 'line', 'line', 'line', 'points'])
 
     # And print a summary of the dataset.
     util.print_statistics(dataset)
