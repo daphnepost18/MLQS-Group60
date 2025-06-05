@@ -134,7 +134,10 @@ class CreateDataset:
 
         # Convert timestamps to dates, using the specified unit
         if timestamp_unit:
-            dataset[timestamp_col] = pd.to_datetime(dataset[timestamp_col], unit=timestamp_unit)
+            if timestamp_unit == 's':  # Handle timestamps in seconds
+                dataset[timestamp_col] = pd.to_datetime(dataset[timestamp_col] * 1e9, unit='ns')
+            else:
+                dataset[timestamp_col] = pd.to_datetime(dataset[timestamp_col], unit=timestamp_unit)
         else:
             dataset[timestamp_col] = pd.to_datetime(dataset[timestamp_col])
 
