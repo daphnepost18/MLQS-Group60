@@ -35,7 +35,7 @@ class VisualizeDataset:
         self.figures_dir.mkdir(exist_ok=True, parents=True)
 
 
-    def save(self, plot_obj, formats=('png', 'pdf'), prefix=None):  # 'svg'
+    def save(self, plot_obj, formats=('png'), prefix=None):  # 'svg'
         # Use the provided prefix or default to an empty string
         prefix = f"{prefix}_" if prefix else ""
         fig_name = f'{prefix}figure_{self.plot_number}'
