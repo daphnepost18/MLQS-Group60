@@ -139,7 +139,8 @@ def main():
         # And now let us include all LOWPASS measurements that have a form of periodicity (and filter them):
         periodic_measurements = ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)',
                                  "gyr_X (rad/s)","gyr_Y (rad/s)","gyr_Z (rad/s)",
-                                 "mag_X (µT)","mag_Y (µT)","mag_Z (µT)"]
+                                 "mag_X (µT)","mag_Y (µT)","mag_Z (µT)",
+                                 "loc_Height (m)","loc_Velocity (m/s)"]
 
         # Let us apply a lowpass filter and reduce the importance of the data above 1.5 Hz
 
@@ -161,20 +162,9 @@ def main():
 
         dataset = PCA.apply_pca(copy.deepcopy(dataset), selected_predictor_cols, n_pcs)
 
-        print("--- Dataset head before plotting ---")
-        print(dataset.head())
-        print("\n--- NaN counts per column before plotting ---")
-        print(dataset.isnull().sum())
-        # You might also want to check the specific columns you are trying to plot
-        print("\n--- Min/Max of plotting columns ---")
-        for col_group in ['acc_', 'gyr_', 'mag_', 'press_']:
-            relevant_cols = [c for c in dataset.columns if c.startswith(col_group)]
-            for col in relevant_cols:
-                print(f"{col}: Min={dataset[col].min()}, Max={dataset[col].max()}")
-
         # And the overall final dataset:
         DataViz.plot_dataset(dataset,
-                             ['acc_', 'gyr_', 'mag_', 'bar_', 'pca_','label'],
+                             ['acc_', 'gyr_', 'mag_', 'loc_', 'pca_','label'],
                              ['like', 'like', 'like', 'like', 'like', 'like'],
                              ['line', 'line', 'line', 'line', 'points', 'points'])
 
