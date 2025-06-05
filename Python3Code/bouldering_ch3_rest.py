@@ -162,17 +162,6 @@ def main():
 
         dataset = PCA.apply_pca(copy.deepcopy(dataset), selected_predictor_cols, n_pcs)
 
-        print("--- Dataset head before plotting ---")
-        print(dataset.head())
-        print("\n--- NaN counts per column before plotting ---")
-        print(dataset.isnull().sum())
-        # You might also want to check the specific columns you are trying to plot
-        print("\n--- Min/Max of plotting columns ---")
-        for col_group in ['acc_', 'gyr_', 'mag_', 'press_']:
-            relevant_cols = [c for c in dataset.columns if c.startswith(col_group)]
-            for col in relevant_cols:
-                print(f"{col}: Min={dataset[col].min()}, Max={dataset[col].max()}")
-
         # And the overall final dataset:
         DataViz.plot_dataset(dataset,
                              ['acc_', 'gyr_', 'mag_', 'bar_', 'pca_','label'],
