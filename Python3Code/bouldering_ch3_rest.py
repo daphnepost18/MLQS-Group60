@@ -139,7 +139,8 @@ def main():
         # And now let us include all LOWPASS measurements that have a form of periodicity (and filter them):
         periodic_measurements = ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)',
                                  "gyr_X (rad/s)","gyr_Y (rad/s)","gyr_Z (rad/s)",
-                                 "mag_X (µT)","mag_Y (µT)","mag_Z (µT)"]
+                                 "mag_X (µT)","mag_Y (µT)","mag_Z (µT)",
+                                 "loc_Height (m)","loc_Velocity (m/s)","loc_Direction (°)"]
 
         # Let us apply a lowpass filter and reduce the importance of the data above 1.5 Hz
 

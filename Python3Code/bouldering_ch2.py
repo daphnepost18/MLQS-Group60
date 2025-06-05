@@ -52,6 +52,8 @@ for milliseconds_per_instance in GRANULARITIES:
                                             'mag_', timestamp_unit='s')
     dataset.add_numerical_dataset_with_unit('Barometer.csv', "Time (s)", ["X (hPa)"], 'avg', 'bar_',
                                             timestamp_unit='s')
+    dataset.add_numerical_dataset_with_unit('Location.csv', "Time (s)", ["Height (m)","Velocity (m/s)","Direction (°)"], 'avg', 'loc_',
+                                            timestamp_unit='s')
 
     # Get the resulting pandas data table
     dataset = dataset.data_table
@@ -63,9 +65,9 @@ for milliseconds_per_instance in GRANULARITIES:
     DataViz.plot_dataset_boxplot(dataset, ['acc_X (m/s^2)','acc_Y (m/s^2)','acc_Z (m/s^2)'])
 
     # Plot all data
-    DataViz.plot_dataset(dataset, ['acc_', 'gyr_', 'mag_', 'bar_', 'label'],
-                                  ['like', 'like', 'like', 'like', 'like'],
-                                  ['line', 'line', 'line', 'line', 'points'])
+    DataViz.plot_dataset(dataset, ['acc_', 'gyr_', 'mag_', 'bar_', 'loc_', 'label'],
+                                  ['like', 'like', 'like', 'like', 'like', 'like'],
+                                  ['line', 'line', 'line', 'line', 'line', 'points'])
 
     # And print a summary of the dataset.
     util.print_statistics(dataset)
