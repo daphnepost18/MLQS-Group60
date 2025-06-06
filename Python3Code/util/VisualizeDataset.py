@@ -145,7 +145,7 @@ class VisualizeDataset:
             file_prefix = f"plot_{dataset_name.replace(' ', '_')}"
 
         self.save(plt, prefix=file_prefix)  # Pass the new prefix to the save method
-        plt.show()
+        
 
     def plot_xy(self, x, y, method='plot', xlabel=None, ylabel=None, xlim=None, ylim=None, names=None,
                 line_styles=None, loc=None, title=None):
@@ -166,7 +166,7 @@ class VisualizeDataset:
             if names is not None: plt.legend(names)
 
         self.save(plt)
-        plt.show()
+        
 
     def plot_dataset_boxplot(self, dataset, cols, participant_name=None,dataset_name=None):
         plt.Figure(); dataset[cols].plot.box()
@@ -193,7 +193,75 @@ class VisualizeDataset:
             file_prefix = f"boxplot_{dataset_name.replace(' ', '_')}"
 
         self.save(plt, prefix=file_prefix)
-        plt.show()
+        
+
+    def plot_feature_distributions_across_datasets(self, datasets, feature_cols, dataset_labels, main_title=None):
+        num_features = len(feature_cols)
+
+        # Determine grid for subplots (e.g., 2x2, 2x3, etc.)
+        n_rows = math.ceil(num_features / 2.0) if num_features > 1 else 1
+        n_cols = 2 if num_features > 1 else 1
+        if num_features == 1:  # Single plot case, to avoid issue with axs being a single Axes object
+            fig, axs = plt.subplots(n_rows, n_cols, figsize=(10, 5))
+            axs = [axs]  # Make it a list so we can iterate consistently
+        else:
+            fig, axs = plt.subplots(n_rows, n_cols, figsize=(10 * n_cols, 5 * n_rows))
+            axs = axs.flatten()  # Flatten 2D array of axes for easy iteration
+
+        # Iterate through each feature column to create a subplot
+        for i, feature_col in enumerate(feature_cols):
+            ax = axs[i]
+            max_val = -np.inf
+            min_val = np.inf
+
+            # Collect data for bin calculation and limits
+            all_feature_data_for_col = []
+            for dataset_df in datasets:
+                # Filter out NaN values for robust plotting
+                clean_data = dataset_df[feature_col].dropna()
+                if not clean_data.empty:
+                    all_feature_data_for_col.extend(clean_data.tolist())
+                    max_val = max(max_val, clean_data.max())
+                    min_val = min(min_val, clean_data.min())
+
+            # Only plot if there's valid data for this feature column across datasets
+            if all_feature_data_for_col:
+                # Determine common bins across all datasets for this feature for consistent comparison
+                num_bins = 50  # You can adjust this number
+                # Use numpy.histogram_bin_edges to get consistent bins if min/max are finite
+                if np.isfinite(min_val) and np.isfinite(max_val) and (max_val - min_val > 0):
+                    bins = np.histogram_bin_edges(all_feature_data_for_col, bins=num_bins)
+                else:
+                    bins = num_bins  # Fallback to auto-bins if range is zero or infinite
+
+                # Plot histogram for each dataset
+                for j, dataset_df in enumerate(datasets):
+                    clean_data = dataset_df[feature_col].dropna()
+                    if not clean_data.empty:
+                        ax.hist(clean_data, bins=bins, density=True, alpha=0.5, label=dataset_labels[j],
+                                color=self.colors[j % len(self.colors)])
+
+                ax.set_title(f'Distribution of {feature_col}')
+                ax.set_xlabel('Value')
+                ax.set_ylabel('Density')
+                ax.legend(fontsize='small')
+            else:
+                ax.set_title(f'No data for {feature_col}')
+                ax.set_xlabel('Value')
+                ax.set_ylabel('Density')
+
+        # Hide any unused subplots
+        for k in range(num_features, len(axs)):
+            fig.delaxes(axs[k])
+
+        if main_title:
+            fig.suptitle(main_title, fontsize=18)
+
+        fig.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust layout to prevent title overlap
+
+        # Generate a filename prefix for this comparison plot
+        file_prefix = "feature_distributions"
+        self.save(fig, prefix=file_prefix)
 
     # This function plots the real and imaginary amplitudes of the frequencies found in the Fourier transformation.
     def plot_fourier_amplitudes(self, freq, ampl_real, ampl_imag):
@@ -203,7 +271,7 @@ class VisualizeDataset:
         plt.plot(freq, ampl_real, '+', freq, ampl_imag,'+')
         plt.legend(['real', 'imaginary'], numpoints=1)
         self.save(plt)
-        plt.show()
+        
 
     # Plot outliers in case of a binary outlier score. Here, the col specifies the real data
     # column and outlier_col the columns with a binary value (outlier or not)
@@ -220,7 +288,7 @@ class VisualizeDataset:
         xar.plot(data_table.index[~data_table[outlier_col]], data_table[col][~data_table[outlier_col]], 'b+')
         plt.legend(['outlier ' + col, 'no_outlier_' + col], numpoints=1, fontsize='xx-small', loc='upper center',  ncol=2, fancybox=True, shadow=True)
         self.save(plt)
-        plt.show()
+        
 
     # Plot values that have been imputed using one of our imputation approaches. Here, values expresses the
     # 1 to n datasets that have resulted from value imputation.
@@ -253,7 +321,7 @@ class VisualizeDataset:
         plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
         plt.xlabel('time')
         self.save(plt)
-        plt.show()
+        
 
     # This function plots clusters that result from the application of a clustering algorithm
     # and also shows the class label of points. Clusters are displayed via colors, classes
@@ -299,7 +367,7 @@ class VisualizeDataset:
 
         plt.legend(handles, labels, fontsize='xx-small', numpoints=1)
         self.save(plt)
-        plt.show()
+        
 
     # This function plots the silhouettes of the different clusters that have been identified. It plots the
     # silhouette of the individual datapoints per cluster to allow studying the clusters internally as well.
@@ -345,7 +413,7 @@ class VisualizeDataset:
         ax1.set_yticks([])  # Clear the yaxis labels / ticks
         ax1.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
         self.save(plt)
-        plt.show()
+        
 
     # Plot a dendorgram for hierarchical clustering. It assumes that the linkage as
     # used in sk learn is passed as an argument as well.
@@ -358,7 +426,7 @@ class VisualizeDataset:
         #dendrogram(linkage,truncate_mode='lastp',p=10, show_leaf_counts=True, leaf_rotation=90.,leaf_font_size=12.,show_contracted=True, labels=times)
         dendrogram(linkage,truncate_mode='lastp',p=16, show_leaf_counts=True, leaf_rotation=45.,leaf_font_size=8.,show_contracted=True, labels=times)
         self.save(plt)
-        plt.show()
+        
 
     # Plot the confusion matrix that has been derived in the evaluation metrics. Classes expresses the labels
     # for the matrix. We can normalize or show the raw counts. Of course this applies to classification problems.
@@ -385,7 +453,7 @@ class VisualizeDataset:
         plt.ylabel('True label')
         plt.xlabel('Predicted label')
         self.save(plt)
-        plt.show()
+        
 
     # This function plots the predictions or an algorithms (both for the training and test set) versus the real values for
     # a regression problem. It assumes only a single value to be predicted over a number of cases. The variables identified
@@ -423,7 +491,7 @@ class VisualizeDataset:
         plt.annotate('', xy=(test_time[0], y_coord_labels), xycoords='data', xytext=(test_time[-1], y_coord_labels), textcoords='data', arrowprops={'arrowstyle': '<->'})
         plt.annotate('test set', xy=(test_time[int(float(len(test_time))/2)], y_coord_labels*1.02), color='red', xycoords='data', ha='center')
         self.save(plt)
-        plt.show()
+        
 
     # Plot the Pareto front for multi objective optimization problems (for the dynamical systems stuff). We consider the
     # raw output of the MO dynamical systems approach, which includes rows with the fitness and predictions for the training
@@ -442,7 +510,7 @@ class VisualizeDataset:
         plt.ylabel('mse on ' + str(dynsys_output[0][0].columns[1]))
         #plt.savefig('{0} Example ({1}).pdf'.format(ea.__class__.__name__, problem.__class__.__name__), format='pdf')
         self.save(plt)
-        plt.show()
+        
 
     # Plot a prediction for a regression model in case it concerns a multi-objective dynamical systems model. Here, we plot
     # the individual specified. Again, the complete output of the MO approach is used as argument.
@@ -472,7 +540,6 @@ class VisualizeDataset:
         if not ylim is None:
             plt.ylim(ylim)
         self.save(plt)
-        plt.show()
 
     def plot_performances_classification(self, algs, feature_subset_names, scores_over_all_algs):
         self.plot_performances(algs, feature_subset_names, scores_over_all_algs, [0.70, 1.0], 2, 'Accuracy')
