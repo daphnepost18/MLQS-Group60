@@ -295,18 +295,123 @@ class VisualizeDataset:
 
         file_prefix = title.replace(" ", "_").lower() if title else "correlation_heatmap"
         self.save(plt, prefix=file_prefix)
-        plt.close(plt)
+        plt.close()
 
-    # This function plots the real and imaginary amplitudes of the frequencies found in the Fourier transformation.
-    def plot_fourier_amplitudes(self, freq, ampl_real, ampl_imag):
-        plt.xlabel('Freq(Hz)')
-        plt.ylabel('amplitude')
-        # Plot the real values as a '+' and imaginary in the same way (though with a different color).
-        plt.plot(freq, ampl_real, '+', freq, ampl_imag,'+')
-        plt.legend(['real', 'imaginary'], numpoints=1)
-        self.save(plt)
-        plt.close(plt)
-        
+    def plot_feature_over_time_multi_dataset(self, datasets, feature_cols, dataset_labels, main_title=None,
+                                             use_relative_time=False):
+        """
+        Plots multiple specified features over time from multiple datasets, with each feature
+        having its own subplot within a single figure. Useful for comparing trends across
+        different data collection sessions or participants for multiple features simultaneously.
+
+        Parameters:
+        - datasets (list of pd.DataFrame): A list of pandas DataFrames to compare.
+        - feature_cols (list of str): A list of column names/features to plot from each dataset.
+        - dataset_labels (list of str): Labels for each dataset, used in the legend.
+                                        Must be the same length as 'datasets'.
+        - main_title (str, optional): The main title for the entire figure.
+        - use_relative_time (bool): If True, plots time relative to the start of each session (0 seconds).
+                                    Otherwise, uses actual datetime objects.
+        """
+        if not datasets or not feature_cols or not dataset_labels:
+            print("Please provide datasets, feature columns, and dataset labels.")
+            return
+        if len(datasets) != len(dataset_labels):
+            print("Number of datasets must match the number of labels.")
+            return
+
+        num_features = len(feature_cols)
+
+        # Determine grid for subplots (e.g., 2x2, 2x3, etc.)
+        n_cols = 2
+        n_rows = math.ceil(num_features / n_cols)
+        if num_features == 1:
+            n_cols = 1
+
+        fig, axs = plt.subplots(n_rows, n_cols, figsize=(15 * n_cols / 2, 6 * n_rows), sharex=True)
+        axs = axs.flatten() if num_features > 1 else [axs]
+
+        # Max relative time across all datasets to set consistent x-axis limit
+        max_relative_seconds = 0
+
+        # Pre-process datasets to calculate relative time for plotting
+        processed_datasets = []
+        for dataset_df in datasets:
+            df_copy = dataset_df.copy()  # Work on a copy to avoid modifying original DataFrames
+            if use_relative_time:
+                # Calculate relative time in seconds from the first timestamp
+                start_time = df_copy.index.min()
+                df_copy['relative_time_s'] = (df_copy.index - start_time).total_seconds()
+                current_max_seconds = df_copy['relative_time_s'].max()
+                if current_max_seconds > max_relative_seconds:
+                    max_relative_seconds = current_max_seconds
+            processed_datasets.append(df_copy)
+
+        # Iterate through each feature column to create a subplot
+        for i, feature_col in enumerate(feature_cols):
+            ax = axs[i]
+            # No date formatter if using relative time
+            if not use_relative_time:
+                xfmt = md.DateFormatter('%H:%M')
+                ax.xaxis.set_major_formatter(xfmt)
+
+            # Keep track of min/max across datasets for consistent y-limits per subplot
+            min_y, max_y = float('inf'), float('-inf')
+
+            for j, dataset_df_processed in enumerate(processed_datasets):
+                if feature_col in dataset_df_processed.columns:
+                    clean_data = dataset_df_processed[feature_col].dropna()
+                    if not clean_data.empty:
+                        color = self.colors[j % len(self.colors)]
+                        # Use relative_time_s for x-axis if requested, otherwise use index
+                        x_data = dataset_df_processed['relative_time_s'] if use_relative_time else clean_data.index
+                        ax.plot(x_data[clean_data.index], clean_data, color=color, linewidth=0.8,
+                                label=dataset_labels[j])
+
+                        # Update min/max for subplot y-limits
+                        min_y = min(min_y, clean_data.min())
+                        max_y = max(max_y, clean_data.max())
+                    else:
+                        print(f"No valid data for '{feature_col}' in dataset: {dataset_labels[j]} to plot over time.")
+                else:
+                    print(
+                        f"Feature column '{feature_col}' not found in dataset: {dataset_labels[j]}. Skipping this subplot.")
+
+            ax.set_title(f'{feature_col}')
+            ax.set_ylabel('Value')
+
+            # Set y-limits if valid data was found
+            if min_y != float('inf') and max_y != float('-inf') and (max_y - min_y) > 0:
+                buffer = 0.1 * (max_y - min_y)
+                ax.set_ylim([min_y - buffer, max_y + buffer])
+            elif min_y != float('inf'):  # Case where min_y == max_y (flat line)
+                buffer = 0.1 * abs(min_y) if min_y != 0 else 0.1
+                ax.set_ylim([min_y - buffer, min_y + buffer])
+            else:  # No data for this subplot
+                ax.set_ylim([-1, 1])
+
+            if any(feature_col in d.columns and not d[feature_col].dropna().empty for d in datasets):
+                ax.legend(loc='upper right', fontsize='x-small')
+            ax.grid(True, linestyle='--', alpha=0.6)
+
+        # Hide any unused subplots
+        for k in range(num_features, len(axs)):
+            fig.delaxes(axs[k])
+
+        # Set common labels and title for the entire figure
+        fig.text(0.5, 0.04, 'Relative Time (s)' if use_relative_time else 'Time', ha='center', va='center', fontsize=12)
+        if main_title:
+            fig.suptitle(main_title, fontsize=18)
+
+        # Set consistent x-axis limits based on max_relative_seconds if using relative time
+        if use_relative_time and max_relative_seconds > 0:
+            for ax in axs:
+                ax.set_xlim([0, max_relative_seconds])  # Ensure all plots have the same max x-axis
+
+        fig.tight_layout(rect=[0, 0.06, 1, 0.95])
+
+        file_prefix = "all_features_over_relative_time_multi_dataset" if use_relative_time else "all_features_over_time_multi_dataset"
+        self.save(fig, prefix=file_prefix)
 
     # Plot outliers in case of a binary outlier score. Here, the col specifies the real data
     # column and outlier_col the columns with a binary value (outlier or not)
@@ -323,7 +428,7 @@ class VisualizeDataset:
         xar.plot(data_table.index[~data_table[outlier_col]], data_table[col][~data_table[outlier_col]], 'b+')
         plt.legend(['outlier ' + col, 'no_outlier_' + col], numpoints=1, fontsize='xx-small', loc='upper center',  ncol=2, fancybox=True, shadow=True)
         self.save(plt)
-        plt.close(plt)
+        plt.close()
         
 
     # Plot values that have been imputed using one of our imputation approaches. Here, values expresses the
@@ -357,7 +462,7 @@ class VisualizeDataset:
         plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
         plt.xlabel('time')
         self.save(plt)
-        plt.close(plt)
+        plt.close()
         
 
     # This function plots clusters that result from the application of a clustering algorithm
@@ -404,7 +509,7 @@ class VisualizeDataset:
 
         plt.legend(handles, labels, fontsize='xx-small', numpoints=1)
         self.save(plt)
-        plt.close(plt)
+        plt.close()
 
     # This function plots the silhouettes of the different clusters that have been identified. It plots the
     # silhouette of the individual datapoints per cluster to allow studying the clusters internally as well.
@@ -450,7 +555,7 @@ class VisualizeDataset:
         ax1.set_yticks([])  # Clear the yaxis labels / ticks
         ax1.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
         self.save(plt)
-        plt.close(plt)
+        plt.close()
 
     # Plot a dendorgram for hierarchical clustering. It assumes that the linkage as
     # used in sk learn is passed as an argument as well.
@@ -463,7 +568,7 @@ class VisualizeDataset:
         #dendrogram(linkage,truncate_mode='lastp',p=10, show_leaf_counts=True, leaf_rotation=90.,leaf_font_size=12.,show_contracted=True, labels=times)
         dendrogram(linkage,truncate_mode='lastp',p=16, show_leaf_counts=True, leaf_rotation=45.,leaf_font_size=8.,show_contracted=True, labels=times)
         self.save(plt)
-        plt.close(plt)
+        plt.close()
 
     # Plot the confusion matrix that has been derived in the evaluation metrics. Classes expresses the labels
     # for the matrix. We can normalize or show the raw counts. Of course this applies to classification problems.
@@ -490,7 +595,7 @@ class VisualizeDataset:
         plt.ylabel('True label')
         plt.xlabel('Predicted label')
         self.save(plt)
-        plt.close(plt)
+        plt.close()
 
     # This function plots the predictions or an algorithms (both for the training and test set) versus the real values for
     # a regression problem. It assumes only a single value to be predicted over a number of cases. The variables identified
@@ -528,7 +633,7 @@ class VisualizeDataset:
         plt.annotate('', xy=(test_time[0], y_coord_labels), xycoords='data', xytext=(test_time[-1], y_coord_labels), textcoords='data', arrowprops={'arrowstyle': '<->'})
         plt.annotate('test set', xy=(test_time[int(float(len(test_time))/2)], y_coord_labels*1.02), color='red', xycoords='data', ha='center')
         self.save(plt)
-        plt.close(plt)
+        plt.close()
 
     # Plot the Pareto front for multi objective optimization problems (for the dynamical systems stuff). We consider the
     # raw output of the MO dynamical systems approach, which includes rows with the fitness and predictions for the training
@@ -547,7 +652,7 @@ class VisualizeDataset:
         plt.ylabel('mse on ' + str(dynsys_output[0][0].columns[1]))
         #plt.savefig('{0} Example ({1}).pdf'.format(ea.__class__.__name__, problem.__class__.__name__), format='pdf')
         self.save(plt)
-        plt.close(plt)
+        plt.close()
 
     # Plot a prediction for a regression model in case it concerns a multi-objective dynamical systems model. Here, we plot
     # the individual specified. Again, the complete output of the MO approach is used as argument.
@@ -577,7 +682,7 @@ class VisualizeDataset:
         if not ylim is None:
             plt.ylim(ylim)
         self.save(plt)
-        plt.close(plt)
+        plt.close()
 
     def plot_performances_classification(self, algs, feature_subset_names, scores_over_all_algs):
         self.plot_performances(algs, feature_subset_names, scores_over_all_algs, [0.70, 1.0], 2, 'Accuracy')

@@ -147,4 +147,12 @@ if len(all_fine_grained_datasets_overall) > 0:
         features_to_compare,all_fine_grained_dataset_names_overall,
         main_title=f"Feature Distributions Across All Bouldering Datasets (All Participants)")
 
+    DataViz.plot_feature_over_time_multi_dataset(
+        all_fine_grained_datasets_overall,
+        features_to_compare,
+        all_fine_grained_dataset_names_overall,
+        main_title='All Feature Readings Across All Bouldering Sessions (Relative Time)',
+        use_relative_time=True
+    )
+
 print('The code has run through successfully!')
