@@ -7,7 +7,6 @@
 #                                                            #
 ##############################################################
 
-# Import the relevant classes.
 from Chapter2.CreateDataset import CreateDataset
 from util.VisualizeDataset import VisualizeDataset
 from util import util
@@ -15,77 +14,86 @@ from pathlib import Path
 import copy
 import os
 import sys
+from datetime import datetime # Still needed for datetime.strptime if you derive start time from folder name
 
-# Chapter 2: Initial exploration of the dataset.
-
-DATASET_PATH = Path('./datasets/bouldering/participant1/Easy1 2025-06-03 19-59-30')
+BASE_DATA_PATH = Path('./datasets/bouldering/participant1/')
 RESULT_PATH = Path('./intermediate_datafiles_bouldering/')
-RESULT_FNAME = 'chapter2_result_bouldering.csv'
 
-# Set a granularity (the discrete step size of our time series data). We'll use a course-grained granularity of one
-# instance per minute, and a fine-grained one with four instances per second.
 GRANULARITIES = [60000, 250]
 
-# We can call Path.mkdir(exist_ok=True) to make any required directories if they don't already exist.
-[path.mkdir(exist_ok=True, parents=True) for path in [DATASET_PATH, RESULT_PATH]]
+[path.mkdir(exist_ok=True, parents=True) for path in [BASE_DATA_PATH, RESULT_PATH]]
 
 print('Please wait, this will take a while to run!')
 
-datasets = []
+# Loop through each dataset folder
+for dataset_folder_name_raw in os.listdir(BASE_DATA_PATH):
+    DATASET_PATH = BASE_DATA_PATH / dataset_folder_name_raw
 
-# Dynamically extract participant and dataset names from DATASET_PATH
-path_parts = str(DATASET_PATH).split('/')
-participant_name = path_parts[-2] # e.g., 'participant1'
-dataset_name = path_parts[-1].split(' ')[0] # Takes 'Easy1' from 'Easy1 2025-06-03 19-59-30'
+    if not DATASET_PATH.is_dir():
+        continue
 
-for milliseconds_per_instance in GRANULARITIES:
-    print(f'Creating numerical datasets from files in {DATASET_PATH} using granularity {milliseconds_per_instance}.')
+    path_parts = str(DATASET_PATH).split('/')
+    print(path_parts)
+    participant_name = path_parts[-2]
+    print(participant_name)
+    dataset_name_full = path_parts[-1]
+    print(dataset_name_full)
+    dataset_name = dataset_name_full.split(' ')[0]
+    print(dataset_name)
 
-    # Create an initial dataset object with the base directory for our data and a granularity
-    dataset = CreateDataset(DATASET_PATH, milliseconds_per_instance)
-
-    # Add the selected measurements to it.
-    dataset.add_numerical_dataset_with_unit('Accelerometer.csv', "Time (s)", ["X (m/s^2)", "Y (m/s^2)", "Z (m/s^2)"],
-                                            'avg', 'acc_', timestamp_unit='s')
-    dataset.add_numerical_dataset_with_unit('Gyroscope.csv', "Time (s)", ["X (rad/s)", "Y (rad/s)", "Z (rad/s)"], 'avg',
-                                            'gyr_', timestamp_unit='s')
-    dataset.add_event_dataset_with_unit('Labels.csv', 'label_start', 'label_end', 'label', 'binary', timestamp_unit='s')
-    dataset.add_numerical_dataset_with_unit('Magnetometer.csv', "Time (s)", ["X (µT)", "Y (µT)", "Z (µT)"], 'avg',
-                                            'mag_', timestamp_unit='s')
-    dataset.add_numerical_dataset_with_unit('Location.csv', "Time (s)", ["Height (m)","Velocity (m/s)"], 'avg', 'loc_',
-                                            timestamp_unit='s')
-
-    # Get the resulting pandas data table
-    dataset = dataset.data_table
-
-    # Plot the data
-    DataViz = VisualizeDataset(__file__)
-
-    # Boxplot
-    DataViz.plot_dataset_boxplot(dataset, ['acc_X (m/s^2)','acc_Y (m/s^2)','acc_Z (m/s^2)'],participant_name=participant_name, dataset_name=dataset_name)
-    DataViz.plot_dataset_boxplot(dataset, ["gyr_X (rad/s)","gyr_Y (rad/s)","gyr_Z (rad/s)"],participant_name=participant_name, dataset_name=dataset_name)
-    DataViz.plot_dataset_boxplot(dataset, ["mag_X (µT)", "mag_Y (µT)", "mag_Z (µT)"],participant_name=participant_name, dataset_name=dataset_name)
-    DataViz.plot_dataset_boxplot(dataset, ["loc_Height (m)","loc_Velocity (m/s)"],participant_name=participant_name, dataset_name=dataset_name)
-
-    # Plot all data
-    DataViz.plot_dataset(dataset, ['acc_', 'gyr_', 'mag_', 'loc_'],
-                                  ['like', 'like', 'like', 'like'],
-                                  ['line', 'line', 'line', 'line'], participant_name=participant_name, dataset_name=dataset_name)
-
-    # And print a summary of the dataset.
-    util.print_statistics(dataset)
-    datasets.append(copy.deepcopy(dataset))
-
-    # If needed, we could save the various versions of the dataset we create in the loop with logical filenames:
-    # dataset.to_csv(RESULT_PATH / f'chapter2_result_{milliseconds_per_instance}')
+    # This part dynamically derives the recording_start_time from the folder name.
+    # This is *critical* for bouldering data's relative timestamps to plot correctly.
+    # Assuming folder name format: 'DatasetName YYYY-MM-DD HH-MM-SS'
+    time_part_str = ' '.join(dataset_name_full.split(' ')[1:])
+    # Adjust for potential '-' in the time portion (e.g., 19-59-30)
+    time_part_str = time_part_str.split(' ')[0] + ' ' + time_part_str.split(' ')[1].replace('-', ':')
+    BOULDERING_START_TIME_FOR_RELATIVE_DATA = datetime.strptime(time_part_str, '%Y-%m-%d %H:%M:%S')
 
 
-# Make a table like the one shown in the book, comparing the two datasets produced.
-util.print_latex_table_statistics_two_datasets(datasets[0], datasets[1])
+    datasets_for_current_folder = []
 
-# Finally, store the last dataset we generated (250 ms).
-dataset.to_csv(RESULT_PATH / RESULT_FNAME)
+    for milliseconds_per_instance in GRANULARITIES:
+        print(f'Creating numerical datasets from files in {DATASET_PATH} using granularity {milliseconds_per_instance}.')
 
-# Lastly, print a statement to know the code went through
+        dataset = CreateDataset(DATASET_PATH, milliseconds_per_instance)
+
+        # Call add_..._with_unit with is_relative_time=True and the derived start time
+        # This is where the relative timestamps are anchored to a real date/time.
+        dataset.add_numerical_dataset_with_unit('Accelerometer.csv', "Time (s)", ["X (m/s^2)", "Y (m/s^2)", "Z (m/s^2)"],
+                                                'avg', 'acc_', is_relative_time=True, recording_start_time=BOULDERING_START_TIME_FOR_RELATIVE_DATA)
+        dataset.add_numerical_dataset_with_unit('Gyroscope.csv', "Time (s)", ["X (rad/s)", "Y (rad/s)", "Z (rad/s)"], 'avg',
+                                                'gyr_', is_relative_time=True, recording_start_time=BOULDERING_START_TIME_FOR_RELATIVE_DATA)
+        dataset.add_event_dataset_with_unit('Labels.csv', 'label_start', 'label_end', 'label', 'binary', is_relative_time=True, recording_start_time=BOULDERING_START_TIME_FOR_RELATIVE_DATA)
+        dataset.add_numerical_dataset_with_unit('Magnetometer.csv', "Time (s)", ["X (µT)", "Y (µT)", "Z (µT)"], 'avg',
+                                                'mag_', is_relative_time=True, recording_start_time=BOULDERING_START_TIME_FOR_RELATIVE_DATA)
+        dataset.add_numerical_dataset_with_unit('Location.csv', "Time (s)", ["Height (m)","Velocity (m/s)"], 'avg', 'loc_',
+                                                is_relative_time=True, recording_start_time=BOULDERING_START_TIME_FOR_RELATIVE_DATA)
+
+        dataset = dataset.data_table
+
+        DataViz = VisualizeDataset(__file__)
+
+        DataViz.plot_dataset_boxplot(dataset, ['acc_X (m/s^2)','acc_Y (m/s^2)','acc_Z (m/s^2)'],
+                                     participant_name=participant_name, dataset_name=dataset_name)
+        DataViz.plot_dataset_boxplot(dataset, ["gyr_X (rad/s)","gyr_Y (rad/s)","gyr_Z (rad/s)"],
+                                     participant_name=participant_name, dataset_name=dataset_name)
+        DataViz.plot_dataset_boxplot(dataset, ["mag_X (µT)", "mag_Y (µT)", "mag_Z (µT)"],
+                                     participant_name=participant_name, dataset_name=dataset_name)
+        DataViz.plot_dataset_boxplot(dataset, ["loc_Height (m)","loc_Velocity (m/s)"],
+                                     participant_name=participant_name, dataset_name=dataset_name)
+
+        DataViz.plot_dataset(dataset, ['acc_', 'gyr_', 'mag_', 'loc_'],
+                                      ['like', 'like', 'like', 'like'],
+                                      ['line', 'line', 'line', 'line'],
+                                      participant_name=participant_name, dataset_name=dataset_name)
+
+        util.print_statistics(dataset)
+        datasets_for_current_folder.append(copy.deepcopy(dataset))
+
+        # Dynamically save the processed dataset for each granularity and folder
+        # RESULT_FNAME_CURRENT = f'chapter2_result_{dataset_name.replace(" ", "_")}_{milliseconds_per_instance}.csv'
+        # dataset.to_csv(RESULT_PATH / RESULT_FNAME_CURRENT)
+
+    util.print_latex_table_statistics_two_datasets(datasets_for_current_folder[0], datasets_for_current_folder[1])
 
 print('The code has run through successfully!')
