@@ -32,6 +32,12 @@ GRANULARITIES = [60000, 250]
 print('Please wait, this will take a while to run!')
 
 datasets = []
+
+# Dynamically extract participant and dataset names from DATASET_PATH
+path_parts = str(DATASET_PATH).split('/')
+participant_name = path_parts[-2] # e.g., 'participant1'
+dataset_name = path_parts[-1].split(' ')[0] # Takes 'Easy1' from 'Easy1 2025-06-03 19-59-30'
+
 for milliseconds_per_instance in GRANULARITIES:
     print(f'Creating numerical datasets from files in {DATASET_PATH} using granularity {milliseconds_per_instance}.')
 
@@ -39,10 +45,6 @@ for milliseconds_per_instance in GRANULARITIES:
     dataset = CreateDataset(DATASET_PATH, milliseconds_per_instance)
 
     # Add the selected measurements to it.
-
-    # In bouldering_ch2.py, modify the dataset.add_... calls:
-
-    # Replace with the new methods and specify unit='s'
     dataset.add_numerical_dataset_with_unit('Accelerometer.csv', "Time (s)", ["X (m/s^2)", "Y (m/s^2)", "Z (m/s^2)"],
                                             'avg', 'acc_', timestamp_unit='s')
     dataset.add_numerical_dataset_with_unit('Gyroscope.csv', "Time (s)", ["X (rad/s)", "Y (rad/s)", "Z (rad/s)"], 'avg',
@@ -60,15 +62,15 @@ for milliseconds_per_instance in GRANULARITIES:
     DataViz = VisualizeDataset(__file__)
 
     # Boxplot
-    DataViz.plot_dataset_boxplot(dataset, ['acc_X (m/s^2)','acc_Y (m/s^2)','acc_Z (m/s^2)'],prefix='bouldering_participant1')
-    DataViz.plot_dataset_boxplot(dataset, ["gyr_X (rad/s)","gyr_Y (rad/s)","gyr_Z (rad/s)"],prefix='bouldering_participant1')
-    DataViz.plot_dataset_boxplot(dataset, ["mag_X (µT)", "mag_Y (µT)", "mag_Z (µT)"],prefix='bouldering_participant1')
-    DataViz.plot_dataset_boxplot(dataset, ["loc_Height (m)","loc_Velocity (m/s)"],prefix='bouldering_participant1')
+    DataViz.plot_dataset_boxplot(dataset, ['acc_X (m/s^2)','acc_Y (m/s^2)','acc_Z (m/s^2)'],participant_name=participant_name, dataset_name=dataset_name)
+    DataViz.plot_dataset_boxplot(dataset, ["gyr_X (rad/s)","gyr_Y (rad/s)","gyr_Z (rad/s)"],participant_name=participant_name, dataset_name=dataset_name)
+    DataViz.plot_dataset_boxplot(dataset, ["mag_X (µT)", "mag_Y (µT)", "mag_Z (µT)"],participant_name=participant_name, dataset_name=dataset_name)
+    DataViz.plot_dataset_boxplot(dataset, ["loc_Height (m)","loc_Velocity (m/s)"],participant_name=participant_name, dataset_name=dataset_name)
 
     # Plot all data
-    DataViz.plot_dataset(dataset, ['acc_', 'gyr_', 'mag_', 'loc_', 'label'],
-                                  ['like', 'like', 'like', 'like', 'like'],
-                                  ['line', 'line', 'line', 'line', 'points'], prefix="bouldering_participant1")
+    DataViz.plot_dataset(dataset, ['acc_', 'gyr_', 'mag_', 'loc_'],
+                                  ['like', 'like', 'like', 'like'],
+                                  ['line', 'line', 'line', 'line'], participant_name=participant_name, dataset_name=dataset_name)
 
     # And print a summary of the dataset.
     util.print_statistics(dataset)

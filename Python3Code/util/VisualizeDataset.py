@@ -38,7 +38,7 @@ class VisualizeDataset:
     def save(self, plot_obj, format='png', prefix=None):  # 'svg'
         # Use the provided prefix or default to an empty string
         prefix = f"{prefix}_" if prefix else ""
-        fig_name = f'{prefix}figure_{self.plot_number}'
+        fig_name = f'{prefix}fig{self.plot_number}'
 
         save_path = self.figures_dir / f'{fig_name}.{format}'
         plot_obj.savefig(save_path)
@@ -50,7 +50,7 @@ class VisualizeDataset:
     # among multiple attributes (e.g. label which occurs as labelWalking, etc). In such a case they are plotted
     # in the same graph. The display should express whether points or a line should be plotted.
     # Match can be 'exact' or 'like'. Display can be 'points' or 'line'.
-    def plot_dataset(self, data_table, columns, match='like', display='line', prefix=None):
+    def plot_dataset(self, data_table, columns, match='like', display='line', participant_name=None,dataset_name=None):
         names = list(data_table.columns)
 
         # Create subplots if more columns are specified.
@@ -83,8 +83,6 @@ class VisualizeDataset:
             max_values = []
             min_values = []
 
-
-
             # Pass through the relevant columns.
             for j in range(0, len(relevant_cols)):
                 # Create a mask to ignore the NaN and Inf values when plotting:
@@ -95,22 +93,58 @@ class VisualizeDataset:
                 # Display point, or as a line
                 if display[i] == 'points':
                     xar[i].plot(data_table.index[mask], data_table[relevant_cols[j]][mask],
-                                self.point_displays[j%len(self.point_displays)])
+                                self.point_displays[j % len(self.point_displays)])
                 else:
                     xar[i].plot(data_table.index[mask], data_table[relevant_cols[j]][mask],
-                                self.line_displays[j%len(self.line_displays)])
+                                self.line_displays[j % len(self.line_displays)])
 
             xar[i].tick_params(axis='y', labelsize=10)
             xar[i].legend(relevant_cols, fontsize='xx-small', numpoints=1, loc='upper center',
                           bbox_to_anchor=(0.5, 1.3), ncol=len(relevant_cols), fancybox=True, shadow=True)
 
-            xar[i].set_ylim([min(min_values) - 0.1*(max(max_values) - min(min_values)),
-                             max(max_values) + 0.1*(max(max_values) - min(min_values))])
+            # Added Robustness to set_ylim (from previous solution)
+            if min_values and max_values:
+                filtered_min_values = [v for v in min_values if pd.notna(v)]
+                filtered_max_values = [v for v in max_values if pd.notna(v)]
+
+                if filtered_min_values and filtered_max_values:
+                    y_min = min(filtered_min_values)
+                    y_max = max(filtered_max_values)
+                    buffer = 0.1 * (y_max - y_min) if (
+                                                                  y_max - y_min) != 0 else 0.1  # Ensure buffer is not zero for flat lines
+                    xar[i].set_ylim([y_min - buffer, y_max + buffer])
+                else:
+                    xar[i].set_ylim(
+                        [-1, 1])  # Default range if filtered lists are empty (e.g., all data for a subplot is NaN)
+            else:
+                xar[i].set_ylim([-1, 1])  # Default range if min/max lists are empty
 
         # Make sure we get a nice figure with only a single x-axis and labels there.
         plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
         plt.xlabel('time')
-        self.save(plt, prefix=prefix)
+
+        # Add the main title to the figure using the new parameters
+        title_str = ""
+        if participant_name and dataset_name:
+            title_str = f"Data for Participant: {participant_name}, Dataset: {dataset_name}"
+        elif participant_name:
+            title_str = f"Data for Participant: {participant_name}"
+        elif dataset_name:
+            title_str = f"Data for Dataset: {dataset_name}"
+
+        if title_str:
+            plt.suptitle(title_str, fontsize=16)  # Using suptitle for a main title over all subplots
+
+        # Generate a filename prefix based on the provided names
+        file_prefix = None
+        if participant_name and dataset_name:
+            file_prefix = f"plot_{participant_name.replace(' ', '_')}_{dataset_name.replace(' ', '_')}"
+        elif participant_name:
+            file_prefix = f"plot_{participant_name.replace(' ', '_')}"
+        elif dataset_name:
+            file_prefix = f"plot_{dataset_name.replace(' ', '_')}"
+
+        self.save(plt, prefix=file_prefix)  # Pass the new prefix to the save method
         plt.show()
 
     def plot_xy(self, x, y, method='plot', xlabel=None, ylabel=None, xlim=None, ylim=None, names=None,
@@ -134,10 +168,31 @@ class VisualizeDataset:
         self.save(plt)
         plt.show()
 
-    def plot_dataset_boxplot(self, dataset, cols, prefix=None):
+    def plot_dataset_boxplot(self, dataset, cols, participant_name=None,dataset_name=None):
         plt.Figure(); dataset[cols].plot.box()
-        #plt.ylim([-30,30])
-        self.save(plt, prefix=prefix)
+
+        # Set title for the boxplot
+        title_str = ""
+        if participant_name and dataset_name:
+            title_str = f"Boxplot for Participant: {participant_name}, Dataset: {dataset_name}"
+        elif participant_name:
+            title_str = f"Boxplot for Participant: {participant_name}"
+        elif dataset_name:
+            title_str = f"Boxplot for Dataset: {dataset_name}"
+
+        if title_str:
+            plt.title(title_str, fontsize=14)
+
+        # Generate a filename prefix based on the provided names
+        file_prefix = None
+        if participant_name and dataset_name:
+            file_prefix = f"boxplot_{participant_name.replace(' ', '_')}_{dataset_name.replace(' ', '_')}"
+        elif participant_name:
+            file_prefix = f"boxplot_{participant_name.replace(' ', '_')}"
+        elif dataset_name:
+            file_prefix = f"boxplot_{dataset_name.replace(' ', '_')}"
+
+        self.save(plt, prefix=file_prefix)
         plt.show()
 
     # This function plots the real and imaginary amplitudes of the frequencies found in the Fourier transformation.
