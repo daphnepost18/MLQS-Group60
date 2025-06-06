@@ -262,6 +262,40 @@ class VisualizeDataset:
         # Generate a filename prefix for this comparison plot
         file_prefix = "feature_distributions"
         self.save(fig, prefix=file_prefix)
+        plt.close(fig)
+
+    def plot_correlation_heatmap(self, dataset, columns=None, title=None):
+        """
+        Plots a heatmap of the Pearson correlation matrix for numerical columns in the dataset.
+
+        Parameters:
+        - dataset (pd.DataFrame): The input pandas DataFrame.
+        - columns (list, optional): A list of column names to include in the correlation matrix.
+                                    If None, all numerical columns will be used.
+        - title (str, optional): The title of the plot.
+        """
+        if columns:
+            df_for_corr = dataset[columns].select_dtypes(include=np.number)
+        else:
+            df_for_corr = dataset.select_dtypes(include=np.number)  # Select only numerical columns
+
+        if df_for_corr.empty:
+            print("No numerical columns to plot for correlation heatmap.")
+            return
+
+        correlation_matrix = df_for_corr.corr(method='pearson')
+
+        plt.figure(figsize=(10, 8))
+        plt.imshow(correlation_matrix, cmap='coolwarm', interpolation='nearest')
+        plt.colorbar(label='Pearson Correlation Coefficient')
+        plt.xticks(range(len(correlation_matrix.columns)), correlation_matrix.columns, rotation=90, fontsize=8)
+        plt.yticks(range(len(correlation_matrix.columns)), correlation_matrix.columns, fontsize=8)
+        plt.title(title if title else 'Pearson Correlation Heatmap')
+        plt.tight_layout()  # Adjust layout to prevent labels from overlapping
+
+        file_prefix = title.replace(" ", "_").lower() if title else "correlation_heatmap"
+        self.save(plt, prefix=file_prefix)
+        plt.close(plt)
 
     # This function plots the real and imaginary amplitudes of the frequencies found in the Fourier transformation.
     def plot_fourier_amplitudes(self, freq, ampl_real, ampl_imag):
@@ -271,6 +305,7 @@ class VisualizeDataset:
         plt.plot(freq, ampl_real, '+', freq, ampl_imag,'+')
         plt.legend(['real', 'imaginary'], numpoints=1)
         self.save(plt)
+        plt.close(plt)
         
 
     # Plot outliers in case of a binary outlier score. Here, the col specifies the real data
@@ -288,6 +323,7 @@ class VisualizeDataset:
         xar.plot(data_table.index[~data_table[outlier_col]], data_table[col][~data_table[outlier_col]], 'b+')
         plt.legend(['outlier ' + col, 'no_outlier_' + col], numpoints=1, fontsize='xx-small', loc='upper center',  ncol=2, fancybox=True, shadow=True)
         self.save(plt)
+        plt.close(plt)
         
 
     # Plot values that have been imputed using one of our imputation approaches. Here, values expresses the
@@ -321,6 +357,7 @@ class VisualizeDataset:
         plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
         plt.xlabel('time')
         self.save(plt)
+        plt.close(plt)
         
 
     # This function plots clusters that result from the application of a clustering algorithm
@@ -367,7 +404,7 @@ class VisualizeDataset:
 
         plt.legend(handles, labels, fontsize='xx-small', numpoints=1)
         self.save(plt)
-        
+        plt.close(plt)
 
     # This function plots the silhouettes of the different clusters that have been identified. It plots the
     # silhouette of the individual datapoints per cluster to allow studying the clusters internally as well.
@@ -413,7 +450,7 @@ class VisualizeDataset:
         ax1.set_yticks([])  # Clear the yaxis labels / ticks
         ax1.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
         self.save(plt)
-        
+        plt.close(plt)
 
     # Plot a dendorgram for hierarchical clustering. It assumes that the linkage as
     # used in sk learn is passed as an argument as well.
@@ -426,7 +463,7 @@ class VisualizeDataset:
         #dendrogram(linkage,truncate_mode='lastp',p=10, show_leaf_counts=True, leaf_rotation=90.,leaf_font_size=12.,show_contracted=True, labels=times)
         dendrogram(linkage,truncate_mode='lastp',p=16, show_leaf_counts=True, leaf_rotation=45.,leaf_font_size=8.,show_contracted=True, labels=times)
         self.save(plt)
-        
+        plt.close(plt)
 
     # Plot the confusion matrix that has been derived in the evaluation metrics. Classes expresses the labels
     # for the matrix. We can normalize or show the raw counts. Of course this applies to classification problems.
@@ -453,7 +490,7 @@ class VisualizeDataset:
         plt.ylabel('True label')
         plt.xlabel('Predicted label')
         self.save(plt)
-        
+        plt.close(plt)
 
     # This function plots the predictions or an algorithms (both for the training and test set) versus the real values for
     # a regression problem. It assumes only a single value to be predicted over a number of cases. The variables identified
@@ -491,7 +528,7 @@ class VisualizeDataset:
         plt.annotate('', xy=(test_time[0], y_coord_labels), xycoords='data', xytext=(test_time[-1], y_coord_labels), textcoords='data', arrowprops={'arrowstyle': '<->'})
         plt.annotate('test set', xy=(test_time[int(float(len(test_time))/2)], y_coord_labels*1.02), color='red', xycoords='data', ha='center')
         self.save(plt)
-        
+        plt.close(plt)
 
     # Plot the Pareto front for multi objective optimization problems (for the dynamical systems stuff). We consider the
     # raw output of the MO dynamical systems approach, which includes rows with the fitness and predictions for the training
@@ -510,7 +547,7 @@ class VisualizeDataset:
         plt.ylabel('mse on ' + str(dynsys_output[0][0].columns[1]))
         #plt.savefig('{0} Example ({1}).pdf'.format(ea.__class__.__name__, problem.__class__.__name__), format='pdf')
         self.save(plt)
-        
+        plt.close(plt)
 
     # Plot a prediction for a regression model in case it concerns a multi-objective dynamical systems model. Here, we plot
     # the individual specified. Again, the complete output of the MO approach is used as argument.
@@ -540,6 +577,7 @@ class VisualizeDataset:
         if not ylim is None:
             plt.ylim(ylim)
         self.save(plt)
+        plt.close(plt)
 
     def plot_performances_classification(self, algs, feature_subset_names, scores_over_all_algs):
         self.plot_performances(algs, feature_subset_names, scores_over_all_algs, [0.70, 1.0], 2, 'Accuracy')

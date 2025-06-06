@@ -64,11 +64,11 @@ for participant_folder_name in os.listdir(ROOT_DATA_PATH):
 
         datasets_for_current_folder_granularities = []
 
-        for milliseconds_per_instance in GRANULARITIES:
+        for ms_per_instance in GRANULARITIES:
             print(
-                f'Creating numerical datasets from files in {DATASET_PATH} using granularity {milliseconds_per_instance}.')
+                f'Creating numerical datasets from files in {DATASET_PATH} using granularity {ms_per_instance}.')
 
-            dataset = CreateDataset(DATASET_PATH, milliseconds_per_instance)
+            dataset = CreateDataset(DATASET_PATH, ms_per_instance)
 
             dataset.add_numerical_dataset_with_unit('Accelerometer.csv', "Time (s)",
                                                     ["X (m/s^2)", "Y (m/s^2)", "Z (m/s^2)"],
@@ -108,14 +108,21 @@ for participant_folder_name in os.listdir(ROOT_DATA_PATH):
                                  ['line', 'line', 'line', 'line'],
                                  participant_name=participant_name, dataset_name=dataset_name)
 
+            numerical_cols = ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)',
+                              'gyr_X (rad/s)', 'gyr_Y (rad/s)', 'gyr_Z (rad/s)',
+                              'mag_X (µT)', 'mag_Y (µT)', 'mag_Z (µT)',
+                              'loc_Height (m)', 'loc_Velocity (m/s)']
+            DataViz.plot_correlation_heatmap(dataset, columns=numerical_cols,
+                                             title=f"Correlation Heatmap for {participant_name} - {dataset_name}")
+
             util.print_statistics(dataset)
             datasets_for_current_folder_granularities.append(copy.deepcopy(dataset))
 
-            RESULT_FNAME_CURRENT = f'chapter2_result_{participant_name.replace(" ", "_")}_{dataset_name.replace(" ", "_")}_{milliseconds_per_instance}.csv'
+            RESULT_FNAME_CURRENT = f'chapter2_result_{participant_name.replace(" ", "_")}_{dataset_name.replace(" ", "_")}_{ms_per_instance}.csv'
             dataset.to_csv(RESULT_PATH / RESULT_FNAME_CURRENT)
 
             # Collect the 250ms granularity dataset for cross-dataset comparison FOR THIS PARTICIPANT
-            if milliseconds_per_instance == 250:
+            if ms_per_instance == 250:
                 all_fine_grained_datasets_for_participant.append(copy.deepcopy(dataset))
                 all_fine_grained_dataset_names_for_participant.append(dataset_name)
 
