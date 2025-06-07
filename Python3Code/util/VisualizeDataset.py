@@ -195,20 +195,19 @@ class VisualizeDataset:
 
         self.save(plt, prefix=file_prefix)
         plt.close('all')
-        
+
 
     def plot_feature_distributions_across_datasets(self, datasets, feature_cols, dataset_labels, main_title=None):
         num_features = len(feature_cols)
 
         # Determine grid for subplots (e.g., 2x2, 2x3, etc.)
-        n_rows = math.ceil(num_features / 2.0) if num_features > 1 else 1
-        n_cols = 3 if num_features > 1 else 1
-        if num_features == 1:  # Single plot case, to avoid issue with axs being a single Axes object
-            fig, axs = plt.subplots(n_rows, n_cols, figsize=(10, 5))
-            axs = [axs]  # Make it a list so we can iterate consistently
-        else:
-            fig, axs = plt.subplots(n_rows, n_cols, figsize=(10 * n_cols, 5 * n_rows))
-            axs = axs.flatten()  # Flatten 2D array of axes for easy iteration
+        n_cols = 3
+        n_rows = math.ceil(num_features / n_cols)
+        if num_features == 1:
+            n_cols = 1  # If only one feature, just make it a single column
+
+        fig, axs = plt.subplots(n_rows, n_cols, figsize=(15 * n_cols / 2, 6 * n_rows), sharex=False)
+        axs = axs.flatten() if num_features > 1 else [axs]
 
         # Iterate through each feature column to create a subplot
         for i, feature_col in enumerate(feature_cols):
