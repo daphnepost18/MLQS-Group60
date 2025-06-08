@@ -65,6 +65,9 @@ def main():
             dataset = OutlierDistr.chauvenet(dataset, col, FLAGS.C)
             DataViz.plot_binary_outliers(
                 dataset, col, col + '_outlier')
+        output_file = DATA_PATH / f'chapter3_result_chauvenet_C{FLAGS.C}.csv'    
+        dataset.to_csv(output_file)
+
 
     elif FLAGS.mode == 'mixture':
 
@@ -76,6 +79,8 @@ def main():
             # This requires:
             # n_data_points * n_data_points * point_size =
             # 31839 * 31839 * 32 bits = ~4GB available memory
+        output_file = DATA_PATH / 'chapter3_result_mixture.csv'
+        dataset.to_csv(output_file)
 
     elif FLAGS.mode == 'distance':
         for col in outlier_columns:
@@ -88,6 +93,8 @@ def main():
                 print(
                     'Not enough memory available for simple distance-based outlier detection...')
                 print('Skipping.')
+        output_file = DATA_PATH / f'chapter3_result_distance_dmin{FLAGS.dmin}_fmin{FLAGS.fmin}.csv'
+        dataset.to_csv(output_file)
 
     elif FLAGS.mode == 'LOF':
         for col in outlier_columns:
@@ -99,6 +106,8 @@ def main():
             except MemoryError as e:
                 print('Not enough memory available for lof...')
                 print('Skipping.')
+        output_file = DATA_PATH / f'chapter3_result_lof_K{FLAGS.K}.csv'
+        dataset.to_csv(output_file)
 
     elif FLAGS.mode == 'final':
 
@@ -109,7 +118,8 @@ def main():
             dataset.loc[dataset[f'{col}_outlier'] == True, col] = np.nan
             del dataset[col + '_outlier']
 
-        dataset.to_csv(DATA_PATH / RESULT_FNAME)
+        output_file = DATA_PATH / 'chapter3_result_final.csv'
+        dataset.to_csv(output_file)
 
 
 if __name__ == '__main__':
