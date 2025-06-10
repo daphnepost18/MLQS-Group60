@@ -20,7 +20,9 @@ from datetime import datetime
 ROOT_DATA_PATH = Path('./datasets/bouldering/')
 RESULT_PATH = Path('./intermediate_datafiles_bouldering/')
 
-GRANULARITIES = [60000, 250]
+# Set a granularity (the discrete step size of our time series data). We'll use a course-grained granularity of one
+# instance per minute, and a fine-grained one with four instances per second.
+GRANULARITIES = [250, 500]
 
 [path.mkdir(exist_ok=True, parents=True) for path in [ROOT_DATA_PATH, RESULT_PATH]]
 
