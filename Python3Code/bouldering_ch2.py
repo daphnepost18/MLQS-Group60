@@ -16,7 +16,6 @@ import os
 import sys
 from datetime import datetime
 
-# Changed to the root directory containing all participant folders
 ROOT_DATA_PATH = Path('./datasets/bouldering/')
 RESULT_PATH = Path('./intermediate_datafiles_bouldering/')
 
@@ -32,16 +31,19 @@ print('Please wait, this will take a while to run!')
 all_fine_grained_datasets_overall = []
 all_fine_grained_dataset_names_overall = []
 
-# New Outer Loop: Iterate through each participant folder
 for participant_folder_name in os.listdir(ROOT_DATA_PATH):
     BASE_DATA_PATH = ROOT_DATA_PATH / participant_folder_name
 
     if not BASE_DATA_PATH.is_dir():
         continue  # Skip if it's not a directory (e.g., .DS_Store file)
 
-    participant_name = participant_folder_name  # e.g., 'participant1', 'participant2'
+    participant_name = participant_folder_name
 
     print(f"\n--- Processing Participant: {participant_name} ---")
+
+    participant_labels_path = BASE_DATA_PATH / 'Labels.csv'
+    if not participant_labels_path.is_file():
+        print(f"Warning: Labels.csv not found in {participant_labels_path}. Labels will not be added for this participant's sessions.")
 
     # Lists for datasets within the current participant
     datasets_for_current_participant = []
@@ -67,8 +69,7 @@ for participant_folder_name in os.listdir(ROOT_DATA_PATH):
         datasets_for_current_folder_granularities = []
 
         for ms_per_instance in GRANULARITIES:
-            print(
-                f'Creating numerical datasets from files in {DATASET_PATH} using granularity {ms_per_instance}.')
+            print(f'Creating numerical datasets from files in {DATASET_PATH} using granularity {ms_per_instance}.')
 
             dataset = CreateDataset(DATASET_PATH, ms_per_instance)
 
@@ -80,9 +81,13 @@ for participant_folder_name in os.listdir(ROOT_DATA_PATH):
                                                     ["X (rad/s)", "Y (rad/s)", "Z (rad/s)"], 'avg',
                                                     'gyr_', is_relative_time=True,
                                                     recording_start_time=BOULDERING_START_TIME_FOR_RELATIVE_DATA)
-            dataset.add_event_dataset_with_unit('Labels.csv', 'label_start', 'label_end', 'label', 'binary',
-                                                is_relative_time=True,
-                                                recording_start_time=BOULDERING_START_TIME_FOR_RELATIVE_DATA)
+            if participant_labels_path.is_file():
+                dataset.add_event_dataset_with_unit(participant_labels_path, 'label_start', 'label_end', 'label', 'binary',
+                                                    is_relative_time=False,
+                                                    recording_start_time=None)
+            else:
+                print(f"Skipping label addition for session {dataset_name} as Labels.csv was not found at {participant_labels_path}.")
+
             dataset.add_numerical_dataset_with_unit('Magnetometer.csv', "Time (s)", ["X (µT)", "Y (µT)", "Z (µT)"],
                                                     'avg',
                                                     'mag_', is_relative_time=True,
