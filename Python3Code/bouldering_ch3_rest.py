@@ -55,22 +55,32 @@ def main():
             dataset.index = pd.to_datetime(dataset.index)
         except IOError as e:
             print(f'File not found: {input_file_path.name}. Skipping.')
-            continue # Skip to the next file
+            continue
 
         # We'll create an instance of our visualization class to plot the results for each dataset.
         DataViz = VisualizeDataset(__file__)
 
-        # Compute the number of milliseconds covered by an instance based on the first two rows
-        milliseconds_per_instance = (dataset.index[1] - dataset.index[0]).microseconds / 1000
+        # Ensure there are enough data points and a valid time difference
+        if len(dataset.index) < 2:
+            print(f"Dataset {input_file_path.name} has less than 2 data points. Cannot determine sampling frequency. Skipping.")
+            continue
+
+        time_difference_microseconds = (dataset.index[1] - dataset.index[0]).microseconds
+        if time_difference_microseconds == 0:
+            print(f"Dataset {input_file_path.name} has zero time difference between first two points. Cannot determine sampling frequency. Skipping.")
+            continue
+
+        milliseconds_per_instance = time_difference_microseconds / 1000
+        if milliseconds_per_instance == 0:
+            print(f"Dataset {input_file_path.name} has effectively zero milliseconds per instance. Cannot determine sampling frequency. Skipping.")
+            continue
+
 
         # Construct the base name for the output file
         base_output_name = input_file_path.name.replace('chapter3_result_outliers_', 'chapter3_result_final_')
 
         if FLAGS.mode == 'imputation':
             # Let us impute the missing values and plot an example.
-
-            # Note: For multiple files, this plot will overwrite the previous one.
-            # You might want to save plots with unique names or view them one by one.
             imputed_mean_dataset = MisVal.impute_mean(copy.deepcopy(dataset), 'acc_X (m/s^2)')
             imputed_median_dataset = MisVal.impute_median(copy.deepcopy(dataset), 'acc_X (m/s^2)')
             imputed_interpolation_dataset = MisVal.impute_interpolate(copy.deepcopy(dataset), 'acc_X (m/s^2)')
@@ -79,13 +89,10 @@ def main():
                                         imputed_mean_dataset['acc_X (m/s^2)'],
                                         imputed_median_dataset['acc_X (m/s^2)'],
                                         imputed_interpolation_dataset['acc_X (m/s^2)'])
-            # No specific output CSV for this mode, it's illustrative.
 
         elif FLAGS.mode == 'kalman':
             # Using the result from Chapter 2, let us try the Kalman filter on the attribute and study the result.
 
-            # Dynamically derive the original Chapter 2 file path
-            # Example: chapter3_result_outliers_participant1_Easy1_250.csv -> chapter2_result_participant1_Easy1_250.csv
             original_chapter2_fname = input_file_path.name.replace('chapter3_result_outliers_', 'chapter2_result_')
             original_dataset_path = DATA_PATH / original_chapter2_fname
 
@@ -104,92 +111,117 @@ def main():
             DataViz.plot_dataset(kalman_dataset, ['acc_X (m/s^2)', 'acc_X (m/s^2)_kalman'], [
                 'exact', 'exact'], ['line', 'line'])
 
-            # We ignore the Kalman filter output for now...
-
         elif FLAGS.mode == 'lowpass':
-            # Let us apply a lowpass filter and reduce the importance of the data above 1.5 Hz
-            # Determine the sampling frequency.
             fs = float(1000) / milliseconds_per_instance
             cutoff = 1.5
-
             normalized_cutoff = cutoff / (fs / 2)
-            # Let us study acc_X (m/s^2):
-            new_dataset = LowPass.low_pass_filter(copy.deepcopy( dataset), 'acc_X (m/s^2)', fs, normalized_cutoff, order=10)  # Use normalized_cutoff here
+
+            new_dataset = LowPass.low_pass_filter(copy.deepcopy( dataset), 'acc_X (m/s^2)', fs, normalized_cutoff, order=10)
 
             DataViz.plot_dataset(
                 new_dataset.iloc[int(0.4 * len(new_dataset.index)):int(0.43 * len(new_dataset.index)), :],
                 ['acc_X (m/s^2)', 'acc_X (m/s^2)_lowpass'], ['exact', 'exact'], ['line', 'line'])
 
         elif FLAGS.mode == 'PCA':
-            # first impute again, as PCA can not deal with missing values
             for col in [c for c in dataset.columns if not 'label' in c]:
                 dataset = MisVal.impute_interpolate(dataset, col)
 
-            selected_predictor_cols = [c for c in dataset.columns if not ('label' in c)]
+            # Ensure selected_predictor_cols contains ONLY numeric, non-boolean, non-label columns for PCA
+            selected_predictor_cols = [c for c in dataset.columns
+                                       if not ('label' in c) and
+                                       pd.api.types.is_numeric_dtype(dataset[c]) and # Must be numeric
+                                       not pd.api.types.is_bool_dtype(dataset[c])] # Must not be boolean
+
+            if not selected_predictor_cols:
+                print("No numeric columns found for PCA. Skipping PCA for this dataset.")
+                continue
+
             pc_values = PCA.determine_pc_explained_variance(
                 dataset, selected_predictor_cols)
 
-            # Plot the variance explained.
             DataViz.plot_xy(x=[range(1, len(selected_predictor_cols) + 1)], y=[pc_values],
                             xlabel='principal component number', ylabel='explained variance',
                             ylim=[0, 1], line_styles=['b-'])
 
-            # We select 7 as the best number of PC's as this explains most of the variance
-
             n_pcs = 7
+            if n_pcs > len(selected_predictor_cols):
+                print(f"Warning: n_pcs ({n_pcs}) is greater than the number of available numeric columns ({len(selected_predictor_cols)}). Adjusting n_pcs to {len(selected_predictor_cols)}.")
+                n_pcs = len(selected_predictor_cols)
+            if n_pcs == 0:
+                print("No principal components can be computed as there are no numeric columns available. Skipping PCA application.")
+                continue
 
             dataset = PCA.apply_pca(copy.deepcopy(
                 dataset), selected_predictor_cols, n_pcs)
 
-            # And we visualize the result of the PC's
             DataViz.plot_dataset(dataset, ['pca_', 'label'], [
                 'like', 'like'], ['line', 'points'])
 
         elif FLAGS.mode == 'final':
-            # Now, for the final version.
-            # We first start with imputation by interpolation
-
             for col in [c for c in dataset.columns if not 'label' in c]:
                 dataset = MisVal.impute_interpolate(dataset, col)
 
-            # And now let us include all LOWPASS measurements that have a form of periodicity (and filter them):
             periodic_measurements = ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)',
                                      "gyr_X (rad/s)","gyr_Y (rad/s)","gyr_Z (rad/s)",
                                      "mag_X (µT)","mag_Y (µT)","mag_Z (µT)",
                                      "loc_Height (m)","loc_Velocity (m/s)"]
 
-            # Let us apply a lowpass filter and reduce the importance of the data above 1.5 Hz
+            if len(dataset.index) < 2:
+                print(f"Dataset {input_file_path.name} has less than 2 data points. Cannot determine sampling frequency. Skipping lowpass filter.")
+                pass
+            else:
+                time_difference_microseconds = (dataset.index[1] - dataset.index[0]).microseconds
+                if time_difference_microseconds == 0:
+                    print(f"Dataset {input_file_path.name} has zero time difference. Cannot determine sampling frequency. Skipping lowpass filter.")
+                    pass
+                else:
+                    milliseconds_per_instance = time_difference_microseconds / 1000
+                    fs = float(1000) / milliseconds_per_instance
+                    cutoff = 1.5
+                    normalized_cutoff = cutoff / (fs / 2)
 
-            # Determine the sampling frequency.
-            fs = float(1000) / milliseconds_per_instance
-            cutoff = 1.5
+                    for col in periodic_measurements:
+                        if col in dataset.columns and pd.api.types.is_numeric_dtype(dataset[col]):
+                            dataset = LowPass.low_pass_filter(
+                                dataset, col, fs, normalized_cutoff, order=10)
+                            dataset[col] = dataset[col + '_lowpass']
+                            del dataset[col + '_lowpass']
+                        else:
+                            print(f"Warning: Periodic measurement column '{col}' not found or not numeric in dataset. Skipping lowpass filter for this column.")
 
-            # Normalize the cutoff frequency for the digital filter.
-            # Wn = cutoff_frequency / (sampling_frequency / 2)
-            normalized_cutoff = cutoff / (fs / 2)
 
-            for col in periodic_measurements:
-                dataset = LowPass.low_pass_filter(
-                    dataset, col, fs, normalized_cutoff, order=10)  # Use normalized_cutoff here
-                dataset[col] = dataset[col + '_lowpass']
-                del dataset[col + '_lowpass']
+            # Ensure selected_predictor_cols contains ONLY numeric, non-boolean, non-label columns for final PCA
+            selected_predictor_cols = [c for c in dataset.columns
+                                       if not ('label' in c) and
+                                       pd.api.types.is_numeric_dtype(dataset[c]) and # Must be numeric
+                                       not pd.api.types.is_bool_dtype(dataset[c])] # Must not be boolean
 
-            # We used the optimal found parameter n_pcs = 7, to apply PCA to the final dataset
-
-            selected_predictor_cols = [c for c in dataset.columns if not ('label' in c)]
+            if not selected_predictor_cols:
+                print("No numeric columns found for final PCA. Skipping PCA application for this dataset.")
+                output_file = DATA_PATH / f'{base_output_name}'
+                dataset.to_csv(output_file)
+                print(f"Results for {input_file_path.name} (PCA skipped) saved to: {output_file}")
+                continue
 
             n_pcs = 7
+            if n_pcs > len(selected_predictor_cols):
+                print(f"Warning: n_pcs ({n_pcs}) is greater than the number of available numeric columns ({len(selected_predictor_cols)}). Adjusting n_pcs to {len(selected_predictor_cols)}.")
+                n_pcs = len(selected_predictor_cols)
+            if n_pcs == 0:
+                print("No principal components can be computed as there are no numeric columns available. Skipping PCA application.")
+                output_file = DATA_PATH / f'{base_output_name}'
+                dataset.to_csv(output_file)
+                print(f"Results for {input_file_path.name} (PCA skipped) saved to: {output_file}")
+                continue
 
             dataset = PCA.apply_pca(copy.deepcopy(dataset), selected_predictor_cols, n_pcs)
 
-            # And the overall final dataset:
             DataViz.plot_dataset(dataset,
                                  ['acc_', 'gyr_', 'mag_', 'loc_', 'pca_','label'],
                                  ['like', 'like', 'like', 'like', 'like', 'like'],
                                  ['line', 'line', 'line', 'line', 'points', 'points'])
 
-            # Store the final outcome.
-            output_file = DATA_PATH / f'{base_output_name}' # Uses the base name directly for final output
+            output_file = DATA_PATH / f'{base_output_name}'
             dataset.to_csv(output_file)
             print(f"Final results for {input_file_path.name} saved to: {output_file}")
 
