@@ -118,7 +118,7 @@ def main():
             dataset.loc[dataset[f'{col}_outlier'] == True, col] = np.nan
             del dataset[col + '_outlier']
 
-        output_file = DATA_PATH / 'chapter3_result_final.csv'
+        output_file = DATA_PATH / RESULT_FNAME
         dataset.to_csv(output_file)
 
 
