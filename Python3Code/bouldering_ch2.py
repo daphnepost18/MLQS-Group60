@@ -21,7 +21,7 @@ RESULT_PATH = Path('./intermediate_datafiles_bouldering/')
 
 # Set a granularity (the discrete step size of our time series data). We'll use a course-grained granularity of one
 # instance per minute, and a fine-grained one with four instances per second.
-GRANULARITIES = [250, 500]
+GRANULARITIES = [250, 1000]
 
 [path.mkdir(exist_ok=True, parents=True) for path in [ROOT_DATA_PATH, RESULT_PATH]]
 
@@ -125,13 +125,12 @@ for participant_folder_name in os.listdir(ROOT_DATA_PATH):
             util.print_statistics(dataset)
             datasets_for_current_folder_granularities.append(copy.deepcopy(dataset))
 
-            RESULT_FNAME_CURRENT = f'chapter2_result_{participant_name.replace(" ", "_")}_{dataset_name.replace(" ", "_")}_{ms_per_instance}.csv'
-            dataset.to_csv(RESULT_PATH / RESULT_FNAME_CURRENT)
-
             # Collect the 250ms granularity dataset for cross-dataset comparison FOR THIS PARTICIPANT
             if ms_per_instance == 250:
                 all_fine_grained_datasets_for_participant.append(copy.deepcopy(dataset))
                 all_fine_grained_dataset_names_for_participant.append(dataset_name)
+                RESULT_FNAME_CURRENT = f'chapter2_result_{participant_name.replace(" ", "_")}_{dataset_name.replace(" ", "_")}_{ms_per_instance}.csv'
+                dataset.to_csv(RESULT_PATH / RESULT_FNAME_CURRENT)
 
         util.print_latex_table_statistics_two_datasets(datasets_for_current_folder_granularities[0],
                                                        datasets_for_current_folder_granularities[1])

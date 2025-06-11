@@ -108,15 +108,17 @@ def main():
 
         elif FLAGS.mode == 'lowpass':
             # Let us apply a lowpass filter and reduce the importance of the data above 1.5 Hz
-
             # Determine the sampling frequency.
             fs = float(1000) / milliseconds_per_instance
             cutoff = 1.5
+
+            normalized_cutoff = cutoff / (fs / 2)
             # Let us study acc_X (m/s^2):
-            new_dataset = LowPass.low_pass_filter(copy.deepcopy(
-                dataset), 'acc_X (m/s^2)', fs, cutoff, order=10)
-            DataViz.plot_dataset(new_dataset.iloc[int(0.4 * len(new_dataset.index)):int(0.43 * len(new_dataset.index)), :],
-                                 ['acc_X (m/s^2)', 'acc_X (m/s^2)_lowpass'], ['exact', 'exact'], ['line', 'line'])
+            new_dataset = LowPass.low_pass_filter(copy.deepcopy( dataset), 'acc_X (m/s^2)', fs, normalized_cutoff, order=10)  # Use normalized_cutoff here
+
+            DataViz.plot_dataset(
+                new_dataset.iloc[int(0.4 * len(new_dataset.index)):int(0.43 * len(new_dataset.index)), :],
+                ['acc_X (m/s^2)', 'acc_X (m/s^2)_lowpass'], ['exact', 'exact'], ['line', 'line'])
 
         elif FLAGS.mode == 'PCA':
             # first impute again, as PCA can not deal with missing values
@@ -162,9 +164,13 @@ def main():
             fs = float(1000) / milliseconds_per_instance
             cutoff = 1.5
 
+            # Normalize the cutoff frequency for the digital filter.
+            # Wn = cutoff_frequency / (sampling_frequency / 2)
+            normalized_cutoff = cutoff / (fs / 2)
+
             for col in periodic_measurements:
                 dataset = LowPass.low_pass_filter(
-                    dataset, col, fs, cutoff, order=10)
+                    dataset, col, fs, normalized_cutoff, order=10)  # Use normalized_cutoff here
                 dataset[col] = dataset[col + '_lowpass']
                 del dataset[col + '_lowpass']
 
