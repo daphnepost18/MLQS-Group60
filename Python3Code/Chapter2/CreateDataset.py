@@ -14,6 +14,7 @@ import copy
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plot
 import matplotlib.dates as md
+from pathlib import Path # Import Path for robust path handling
 
 class CreateDataset:
 
@@ -22,7 +23,7 @@ class CreateDataset:
     data_table = None
 
     def __init__(self, base_dir, granularity):
-        self.base_dir = base_dir
+        self.base_dir = Path(base_dir) # Ensure base_dir is a Path object
         self.granularity = granularity
 
     # Create an initial data table with entries from start till end time, with steps
@@ -42,7 +43,7 @@ class CreateDataset:
 
     # Add numerical data, we assume timestamps in the form of nanoseconds from the epoch
     def add_numerical_dataset(self, file, timestamp_col, value_cols, aggregation='avg', prefix=''):
-        print(f'Reading data from {file}')
+        print(f'Reading data from {self.base_dir / file}') # Updated print for clarity
         dataset = pd.read_csv(self.base_dir / file, skipinitialspace=True)
 
         # Convert timestamps to dates
@@ -80,7 +81,8 @@ class CreateDataset:
     # Add data in which we have rows that indicate the occurrence of a certain event with a given start and end time.
     # 'aggregation' can be 'sum' or 'binary'.
     def add_event_dataset(self, file, start_timestamp_col, end_timestamp_col, value_col, aggregation='sum'):
-        print(f'Reading data from {file}')
+        # This method assumes the 'file' is relative to base_dir
+        print(f'Reading data from {self.base_dir / file}') # Updated print for clarity
         dataset = pd.read_csv(self.base_dir / file)
 
         # Convert timestamps to datetime.
@@ -130,8 +132,14 @@ class CreateDataset:
     # Add numerical data, with an explicit timestamp unit
     def add_numerical_dataset_with_unit(self, file, timestamp_col, value_cols, aggregation='avg', prefix='',
                                         timestamp_unit=None, is_relative_time=False, recording_start_time=None):
-        print(f'Reading data from {file}')
-        dataset = pd.read_csv(self.base_dir / file, skipinitialspace=True)
+        # Determine the file path based on whether 'file' is already a Path object or a string
+        if isinstance(file, Path):
+            file_path = file
+        else:
+            file_path = self.base_dir / file
+
+        print(f'Reading data from {file_path}') # Updated print for clarity
+        dataset = pd.read_csv(file_path, skipinitialspace=True)
 
         if is_relative_time:
             # Convert timestamp column to float to perform arithmetic operations
@@ -200,8 +208,14 @@ class CreateDataset:
 
     # Add event data, with an explicit timestamp unit
     def add_event_dataset_with_unit(self, file, start_timestamp_col, end_timestamp_col, value_col, aggregation='sum', timestamp_unit=None, is_relative_time=False, recording_start_time=None):
-        print(f'Reading data from {file}')
-        dataset = pd.read_csv(self.base_dir / file)
+        # Determine the file path based on whether 'file' is already a Path object or a string
+        if isinstance(file, Path):
+            file_path = file
+        else:
+            file_path = self.base_dir / file
+
+        print(f'Reading data from {file_path}') # Updated print for clarity
+        dataset = pd.read_csv(file_path)
 
         if is_relative_time:
             # Convert timestamp columns to float to perform arithmetic operations
@@ -282,4 +296,3 @@ class CreateDataset:
                 self.data_table.loc[relevant_rows.index, str(value_col) + str(value)] = 1
             else:
                 raise ValueError("Unknown aggregation '" + aggregation + "'")
-

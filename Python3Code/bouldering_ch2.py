@@ -41,6 +41,7 @@ for participant_folder_name in os.listdir(ROOT_DATA_PATH):
 
     print(f"\n--- Processing Participant: {participant_name} ---")
 
+    # Define the path to Labels.csv at the participant level
     participant_labels_path = BASE_DATA_PATH / 'Labels.csv'
     if not participant_labels_path.is_file():
         print(f"Warning: Labels.csv not found in {participant_labels_path}. Labels will not be added for this participant's sessions.")
@@ -52,6 +53,10 @@ for participant_folder_name in os.listdir(ROOT_DATA_PATH):
 
     # Iterate through each dataset folder within the current participant's directory
     for dataset_folder_name_raw in os.listdir(BASE_DATA_PATH):
+        # Skip Labels.csv itself when iterating through dataset folders
+        if dataset_folder_name_raw == 'Labels.csv':
+            continue
+
         DATASET_PATH = BASE_DATA_PATH / dataset_folder_name_raw
 
         if not DATASET_PATH.is_dir():
@@ -62,6 +67,7 @@ for participant_folder_name in os.listdir(ROOT_DATA_PATH):
         dataset_name = dataset_name_full.split(' ')[0]
 
         # Dynamically derive the recording_start_time from the folder name
+        # This time is for the *relative* timestamps in sensor data (Accelerometer, Gyroscope etc.)
         time_part_str = ' '.join(dataset_name_full.split(' ')[1:])
         time_part_str = time_part_str.split(' ')[0] + ' ' + time_part_str.split(' ')[1].replace('-', ':')
         BOULDERING_START_TIME_FOR_RELATIVE_DATA = datetime.strptime(time_part_str, '%Y-%m-%d %H:%M:%S')
@@ -81,21 +87,27 @@ for participant_folder_name in os.listdir(ROOT_DATA_PATH):
                                                     ["X (rad/s)", "Y (rad/s)", "Z (rad/s)"], 'avg',
                                                     'gyr_', is_relative_time=True,
                                                     recording_start_time=BOULDERING_START_TIME_FOR_RELATIVE_DATA)
-            if participant_labels_path.is_file():
-                dataset.add_event_dataset_with_unit(participant_labels_path, 'label_start', 'label_end', 'label', 'binary',
-                                                    is_relative_time=False,
-                                                    recording_start_time=None)
-            else:
-                print(f"Skipping label addition for session {dataset_name} as Labels.csv was not found at {participant_labels_path}.")
 
             dataset.add_numerical_dataset_with_unit('Magnetometer.csv', "Time (s)", ["X (µT)", "Y (µT)", "Z (µT)"],
                                                     'avg',
                                                     'mag_', is_relative_time=True,
                                                     recording_start_time=BOULDERING_START_TIME_FOR_RELATIVE_DATA)
+
             dataset.add_numerical_dataset_with_unit('Location.csv', "Time (s)", ["Height (m)", "Velocity (m/s)"], 'avg',
                                                     'loc_',
                                                     is_relative_time=True,
                                                     recording_start_time=BOULDERING_START_TIME_FOR_RELATIVE_DATA)
+
+            if participant_labels_path.is_file():
+                # For Labels.csv, the timestamps 'label_start' and 'label_end' are absolute Unix timestamps
+                # (seconds since epoch), so we set is_relative_time=False and timestamp_unit='s'.
+                # recording_start_time is not needed for absolute timestamps.
+                dataset.add_event_dataset_with_unit(participant_labels_path, 'label_start', 'label_end', 'label', 'binary',
+                                                    timestamp_unit='s', # Specify unit as seconds for Unix timestamps
+                                                    is_relative_time=False,
+                                                    recording_start_time=None) # Not applicable for absolute times
+            else:
+                print(f"Skipping label addition for session {dataset_name} as Labels.csv was not found at {participant_labels_path}.")
 
             dataset = dataset.data_table
 
@@ -110,9 +122,9 @@ for participant_folder_name in os.listdir(ROOT_DATA_PATH):
             DataViz.plot_dataset_boxplot(dataset, ["loc_Height (m)", "loc_Velocity (m/s)"],
                                          participant_name=participant_name, dataset_name=dataset_name)
 
-            DataViz.plot_dataset(dataset, ['acc_', 'gyr_', 'mag_', 'loc_'],
-                                 ['like', 'like', 'like', 'like'],
-                                 ['line', 'line', 'line', 'line'],
+            DataViz.plot_dataset(dataset, ['acc_', 'gyr_', 'mag_', 'loc_', 'label'], # Added 'label' to visualize labels
+                                 ['like', 'like', 'like', 'like', 'like'], # Added 'like' for label
+                                 ['line', 'line', 'line', 'line', 'points'], # Added 'points' for label to show event occurrences
                                  participant_name=participant_name, dataset_name=dataset_name)
 
             numerical_cols = ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)',
