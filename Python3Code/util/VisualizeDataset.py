@@ -18,15 +18,15 @@ import sys
 from pathlib import Path
 import dateutil
 import matplotlib as mpl
+
 mpl.use('Agg')
 
-class VisualizeDataset:
 
-    point_displays = ['+', 'x'] #'*', 'd', 'o', 's', '<', '>']
-    line_displays = ['-'] #, '--', ':', '-.']
+class VisualizeDataset:
+    point_displays = ['+', 'x']  # '*', 'd', 'o', 's', '<', '>']
+    line_displays = ['-']  # , '--', ':', '-.']
     colors = ['r', 'g', 'b', 'c', 'm', 'y', 'k']
 
-    # Set some initial attributes to define and create a save location for the images.
     def __init__(self, module_path='.py'):
         subdir = Path(module_path).name.split('.')[0]
 
@@ -34,9 +34,7 @@ class VisualizeDataset:
         self.figures_dir = Path('figures') / subdir
         self.figures_dir.mkdir(exist_ok=True, parents=True)
 
-
-    def save(self, plot_obj, format='png', prefix=None):  # 'svg'
-        # Use the provided prefix or default to an empty string
+    def save(self, plot_obj, format='png', prefix=None):
         prefix = f"{prefix}_" if prefix else ""
         fig_name = f'{prefix}fig{self.plot_number}'
 
@@ -46,14 +44,10 @@ class VisualizeDataset:
 
         self.plot_number += 1
 
-    # Plot the dataset, here columns can specify a specific attribute, but also a generic name that occurs
-    # among multiple attributes (e.g. label which occurs as labelWalking, etc). In such a case they are plotted
-    # in the same graph. The display should express whether points or a line should be plotted.
-    # Match can be 'exact' or 'like'. Display can be 'points' or 'line'.
-    def plot_dataset(self, data_table, columns, match='like', display='line', participant_name=None,dataset_name=None):
+    def plot_dataset(self, data_table, columns, match='like', display='line', participant_name=None, dataset_name=None):
+        data_table.index = pd.to_datetime(data_table.index)
         names = list(data_table.columns)
 
-        # Create subplots if more columns are specified.
         if len(columns) > 1:
             f, xar = plt.subplots(len(columns), sharex=True, sharey=False)
         else:
@@ -62,17 +56,12 @@ class VisualizeDataset:
 
         f.subplots_adjust(hspace=0.4)
 
-        xfmt = md.DateFormatter('%H:%M')
+        xfmt = md.DateFormatter('%H:%M:%S.%f')
 
-        # Pass through the columns specified.
         for i in range(0, len(columns)):
             xar[i].xaxis.set_major_formatter(xfmt)
             xar[i].set_prop_cycle(color=['b', 'g', 'r', 'c', 'm', 'y', 'k'])
-            # if a column match is specified as 'exact', select the column name(s) with an exact match.
-            # If it's specified as 'like', select columns containing the name.
 
-            # We can match exact (i.e. a columns name is an exact name of a columns or 'like' for
-            # which we need to find columns names in the dataset that contain the name.
             if match[i] == 'exact':
                 relevant_cols = [columns[i]]
             elif match[i] == 'like':
@@ -83,14 +72,11 @@ class VisualizeDataset:
             max_values = []
             min_values = []
 
-            # Pass through the relevant columns.
             for j in range(0, len(relevant_cols)):
-                # Create a mask to ignore the NaN and Inf values when plotting:
                 mask = data_table[relevant_cols[j]].replace([np.inf, -np.inf], np.nan).notnull()
                 max_values.append(data_table[relevant_cols[j]][mask].max())
                 min_values.append(data_table[relevant_cols[j]][mask].min())
 
-                # Display point, or as a line
                 if display[i] == 'points':
                     xar[i].plot(data_table.index[mask], data_table[relevant_cols[j]][mask],
                                 self.point_displays[j % len(self.point_displays)])
@@ -102,7 +88,6 @@ class VisualizeDataset:
             xar[i].legend(relevant_cols, fontsize='xx-small', numpoints=1, loc='upper center',
                           bbox_to_anchor=(0.5, 1.3), ncol=len(relevant_cols), fancybox=True, shadow=True)
 
-            # Added Robustness to set_ylim (from previous solution)
             if min_values and max_values:
                 filtered_min_values = [v for v in min_values if pd.notna(v)]
                 filtered_max_values = [v for v in max_values if pd.notna(v)]
@@ -114,15 +99,13 @@ class VisualizeDataset:
                     xar[i].set_ylim([y_min - buffer, y_max + buffer])
                 else:
                     xar[i].set_ylim(
-                        [-1, 1])  # Default range if filtered lists are empty (e.g., all data for a subplot is NaN)
+                        [-1, 1])
             else:
-                xar[i].set_ylim([-1, 1])  # Default range if min/max lists are empty
+                xar[i].set_ylim([-1, 1])
 
-        # Make sure we get a nice figure with only a single x-axis and labels there.
         plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
         plt.xlabel('time')
 
-        # Add the main title to the figure using the new parameters
         title_str = ""
         if participant_name and dataset_name:
             title_str = f"Data for Participant: {participant_name}, Dataset: {dataset_name}"
@@ -132,9 +115,8 @@ class VisualizeDataset:
             title_str = f"Data for Dataset: {dataset_name}"
 
         if title_str:
-            plt.suptitle(title_str, fontsize=16)  # Using suptitle for a main title over all subplots
+            plt.suptitle(title_str, fontsize=16)
 
-        # Generate a filename prefix based on the provided names
         file_prefix = None
         if participant_name and dataset_name:
             file_prefix = f"plot_{participant_name.replace(' ', '_')}_{dataset_name.replace(' ', '_')}"
@@ -145,7 +127,6 @@ class VisualizeDataset:
 
         self.save(plt, prefix=file_prefix)
         plt.close('all')
-        
 
     def plot_xy(self, x, y, method='plot', xlabel=None, ylabel=None, xlim=None, ylim=None, names=None,
                 line_styles=None, loc=None, title=None):
@@ -167,12 +148,11 @@ class VisualizeDataset:
 
         self.save(plt)
         plt.close('all')
-        
 
-    def plot_dataset_boxplot(self, dataset, cols, participant_name=None,dataset_name=None):
-        plt.Figure(); dataset[cols].plot.box()
+    def plot_dataset_boxplot(self, dataset, cols, participant_name=None, dataset_name=None):
+        plt.Figure();
+        dataset[cols].plot.box()
 
-        # Set title for the boxplot
         title_str = ""
         if participant_name and dataset_name:
             title_str = f"Boxplot for Participant: {participant_name}, Dataset: {dataset_name}"
@@ -184,7 +164,6 @@ class VisualizeDataset:
         if title_str:
             plt.title(title_str, fontsize=14)
 
-        # Generate a filename prefix based on the provided names
         file_prefix = None
         if participant_name and dataset_name:
             file_prefix = f"boxplot_{participant_name.replace(' ', '_')}_{dataset_name.replace(' ', '_')}"
@@ -196,46 +175,37 @@ class VisualizeDataset:
         self.save(plt, prefix=file_prefix)
         plt.close('all')
 
-
     def plot_feature_distributions_across_datasets(self, datasets, feature_cols, dataset_labels, main_title=None):
         num_features = len(feature_cols)
 
-        # Determine grid for subplots (e.g., 2x2, 2x3, etc.)
         n_cols = 3
         n_rows = math.ceil(num_features / n_cols)
         if num_features == 1:
-            n_cols = 1  # If only one feature, just make it a single column
+            n_cols = 1
 
         fig, axs = plt.subplots(n_rows, n_cols, figsize=(15 * n_cols / 2, 6 * n_rows), sharex=False)
         axs = axs.flatten() if num_features > 1 else [axs]
 
-        # Iterate through each feature column to create a subplot
         for i, feature_col in enumerate(feature_cols):
             ax = axs[i]
             max_val = -np.inf
             min_val = np.inf
 
-            # Collect data for bin calculation and limits
             all_feature_data_for_col = []
             for dataset_df in datasets:
-                # Filter out NaN values for robust plotting
                 clean_data = dataset_df[feature_col].dropna()
                 if not clean_data.empty:
                     all_feature_data_for_col.extend(clean_data.tolist())
                     max_val = max(max_val, clean_data.max())
                     min_val = min(min_val, clean_data.min())
 
-            # Only plot if there's valid data for this feature column across datasets
             if all_feature_data_for_col:
-                # Determine common bins across all datasets for this feature for consistent comparison
-                num_bins = 50  # You can adjust this number
-                # Use numpy.histogram_bin_edges to get consistent bins if min/max are finite
+                num_bins = 50
                 if np.isfinite(min_val) and np.isfinite(max_val) and (max_val - min_val > 0):
                     bins = np.histogram_bin_edges(all_feature_data_for_col, bins=num_bins)
                 else:
-                    bins = num_bins  # Fallback to auto-bins if range is zero or infinite
+                    bins = num_bins
 
-                # Plot histogram for each dataset
                 for j, dataset_df in enumerate(datasets):
                     clean_data = dataset_df[feature_col].dropna()
                     if not clean_data.empty:
@@ -251,34 +221,23 @@ class VisualizeDataset:
                 ax.set_xlabel('Value')
                 ax.set_ylabel('Density')
 
-        # Hide any unused subplots
         for k in range(num_features, len(axs)):
             fig.delaxes(axs[k])
 
         if main_title:
             fig.suptitle(main_title, fontsize=18)
 
-        fig.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust layout to prevent title overlap
+        fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-        # Generate a filename prefix for this comparison plot
         file_prefix = "feature_distributions"
         self.save(fig, prefix=file_prefix)
         plt.close('all')
 
     def plot_correlation_heatmap(self, dataset, columns=None, title=None):
-        """
-        Plots a heatmap of the Pearson correlation matrix for numerical columns in the dataset.
-
-        Parameters:
-        - dataset (pd.DataFrame): The input pandas DataFrame.
-        - columns (list, optional): A list of column names to include in the correlation matrix.
-                                    If None, all numerical columns will be used.
-        - title (str, optional): The title of the plot.
-        """
         if columns:
             df_for_corr = dataset[columns].select_dtypes(include=np.number)
         else:
-            df_for_corr = dataset.select_dtypes(include=np.number)  # Select only numerical columns
+            df_for_corr = dataset.select_dtypes(include=np.number)
 
         if df_for_corr.empty:
             print("No numerical columns to plot for correlation heatmap.")
@@ -292,7 +251,7 @@ class VisualizeDataset:
         plt.xticks(range(len(correlation_matrix.columns)), correlation_matrix.columns, rotation=90, fontsize=8)
         plt.yticks(range(len(correlation_matrix.columns)), correlation_matrix.columns, fontsize=8)
         plt.title(title if title else 'Pearson Correlation Heatmap')
-        plt.tight_layout()  # Adjust layout to prevent labels from overlapping
+        plt.tight_layout()
 
         file_prefix = title.replace(" ", "_").lower() if title else "correlation_heatmap"
         self.save(plt, prefix=file_prefix)
@@ -300,20 +259,6 @@ class VisualizeDataset:
 
     def plot_feature_over_time_multi_dataset(self, datasets, feature_cols, dataset_labels, main_title=None,
                                              use_relative_time=False):
-        """
-        Plots multiple specified features over time from multiple datasets, with each feature
-        having its own subplot within a single figure. Useful for comparing trends across
-        different data collection sessions or participants for multiple features simultaneously.
-
-        Parameters:
-        - datasets (list of pd.DataFrame): A list of pandas DataFrames to compare.
-        - feature_cols (list of str): A list of column names/features to plot from each dataset.
-        - dataset_labels (list of str): Labels for each dataset, used in the legend.
-                                        Must be the same length as 'datasets'.
-        - main_title (str, optional): The main title for the entire figure.
-        - use_relative_time (bool): If True, plots time relative to the start of each session (0 seconds).
-                                    Otherwise, uses actual datetime objects.
-        """
         if not datasets or not feature_cols or not dataset_labels:
             print("Please provide datasets, feature columns, and dataset labels.")
             return
@@ -323,19 +268,16 @@ class VisualizeDataset:
 
         num_features = len(feature_cols)
 
-        # Determine grid for subplots (e.g., 2x2, 2x3, etc.)
         n_cols = 3
         n_rows = math.ceil(num_features / n_cols)
         if num_features == 1:
-            n_cols = 1  # If only one feature, just make it a single column
+            n_cols = 1
 
         fig, axs = plt.subplots(n_rows, n_cols, figsize=(15 * n_cols / 2, 6 * n_rows), sharex=True)
-        axs = axs.flatten() if num_features > 1 else [axs]  # Flatten 2D array of axes for easy iteration
+        axs = axs.flatten() if num_features > 1 else [axs]
 
-        # Max relative time across all datasets to set consistent x-axis limit
         max_overall_relative_seconds = 0.0
 
-        # Pre-process datasets to calculate relative time for plotting
         processed_datasets = []
         for dataset_df in datasets:
             df_copy = dataset_df.copy()
@@ -344,7 +286,6 @@ class VisualizeDataset:
                 df_copy['relative_time_s'] = (df_copy.index - session_start_time).total_seconds()
             processed_datasets.append(df_copy)
 
-        # Calculate max_overall_relative_seconds based on actual plotted data
         if use_relative_time:
             for feature_col in feature_cols:
                 for dataset_df_processed in processed_datasets:
@@ -354,35 +295,28 @@ class VisualizeDataset:
                             max_time_this_feature = dataset_df_processed.loc[valid_data.index, 'relative_time_s'].max()
                             max_overall_relative_seconds = max(max_overall_relative_seconds, max_time_this_feature)
 
-        # Iterate through each feature column to create a subplot
         for i, feature_col in enumerate(feature_cols):
             ax = axs[i]
-            # No date formatter if using relative time
             if not use_relative_time:
                 xfmt = md.DateFormatter('%H:%M')
                 ax.xaxis.set_major_formatter(xfmt)
 
-            # Keep track of min/max across datasets for consistent y-limits per subplot
             min_y, max_y = float('inf'), float('-inf')
 
             for j, dataset_df_processed in enumerate(processed_datasets):
                 if feature_col in dataset_df_processed.columns:
-                    # Drop NaNs from the specific feature column for plotting
-                    # The x_data (relative_time_s or index) should align with these non-NaN values
                     valid_data_points = dataset_df_processed[feature_col].dropna()
 
                     if not valid_data_points.empty:
                         color = self.colors[j % len(self.colors)]
 
-                        # Ensure x_data aligns with the valid_data_points index
                         if use_relative_time:
                             x_data_for_plot = dataset_df_processed.loc[valid_data_points.index, 'relative_time_s']
                         else:
-                            x_data_for_plot = valid_data_points.index  # Use original datetime index
+                            x_data_for_plot = valid_data_points.index
 
                         ax.plot(x_data_for_plot, valid_data_points, color=color, linewidth=0.8, label=dataset_labels[j])
 
-                        # Update min/max for subplot y-limits
                         min_y = min(min_y, valid_data_points.min())
                         max_y = max(max_y, valid_data_points.max())
                     else:
@@ -394,35 +328,28 @@ class VisualizeDataset:
             ax.set_title(f'{feature_col}')
             ax.set_ylabel('Value')
 
-            # Set y-limits if valid data was found
             if min_y != float('inf') and max_y != float('-inf') and (max_y - min_y) > 0:
                 buffer = 0.1 * (max_y - min_y)
                 ax.set_ylim([min_y - buffer, max_y + buffer])
-            elif min_y != float('inf'):  # Case where min_y == max_y (flat line)
+            elif min_y != float('inf'):
                 buffer = 0.1 * abs(min_y) if min_y != 0 else 0.1
                 ax.set_ylim([min_y - buffer, min_y + buffer])
-            else:  # No data for this subplot
+            else:
                 ax.set_ylim([-1, 1])
 
-            # Add legend only once per subplot
-            # Check if any data was actually plotted for this feature across any dataset
             if any(feature_col in d.columns and not d[feature_col].dropna().empty for d in datasets):
                 ax.legend(loc='upper right', fontsize='x-small')
             ax.grid(True, linestyle='--', alpha=0.6)
 
-        # Hide any unused subplots
         for k in range(num_features, len(axs)):
             fig.delaxes(axs[k])
 
-        # Set common labels and title for the entire figure
         fig.text(0.5, 0.04, 'Relative Time (s)' if use_relative_time else 'Time', ha='center', va='center', fontsize=12)
         if main_title:
             fig.suptitle(main_title, fontsize=18)
 
-        # Set x-axis limits based on actual data range for each subplot
         if use_relative_time:
             for i, ax in enumerate(axs[:num_features]):
-                # Find the actual data range for this specific subplot
                 max_time_for_subplot = 0
                 for j, dataset_df_processed in enumerate(processed_datasets):
                     feature_col = feature_cols[i]
@@ -433,38 +360,32 @@ class VisualizeDataset:
                             max_time_for_subplot = max(max_time_for_subplot, max_time_this_dataset)
 
                 if max_time_for_subplot > 0:
-                    ax.set_xlim([0, max_time_for_subplot * 1.05])  # 5% buffer
+                    ax.set_xlim([0, max_time_for_subplot * 1.05])
 
         fig.tight_layout(rect=[0, 0.06, 1, 0.95])
 
         file_prefix = "all_features_over_relative_time_multi_dataset" if use_relative_time else "all_features_over_time_multi_dataset"
         self.save(fig, prefix=file_prefix)
 
-    # Plot outliers in case of a binary outlier score. Here, the col specifies the real data
-    # column and outlier_col the columns with a binary value (outlier or not)
     def plot_binary_outliers(self, data_table, col, outlier_col):
-        data_table.loc[:,:] = data_table.dropna(axis=0, subset=[col, outlier_col])
-        data_table.loc[:,outlier_col] = data_table[outlier_col].astype('bool')
+        data_table.loc[:, :] = data_table.dropna(axis=0, subset=[col, outlier_col])
+        data_table.loc[:, outlier_col] = data_table[outlier_col].astype('bool')
         f, xar = plt.subplots()
         xfmt = md.DateFormatter('%H:%M')
         xar.xaxis.set_major_formatter(xfmt)
         plt.xlabel('time')
         plt.ylabel('value')
-        # Plot data points that are outliers in red, and non outliers in blue.
         xar.plot(data_table.index[data_table[outlier_col]], data_table[col][data_table[outlier_col]], 'r+')
         xar.plot(data_table.index[~data_table[outlier_col]], data_table[col][~data_table[outlier_col]], 'b+')
-        plt.legend(['outlier ' + col, 'no_outlier_' + col], numpoints=1, fontsize='xx-small', loc='upper center',  ncol=2, fancybox=True, shadow=True)
+        plt.legend(['outlier ' + col, 'no_outlier_' + col], numpoints=1, fontsize='xx-small', loc='upper center',
+                   ncol=2, fancybox=True, shadow=True)
         self.save(plt)
         plt.close('all')
-        
 
-    # Plot values that have been imputed using one of our imputation approaches. Here, values expresses the
-    # 1 to n datasets that have resulted from value imputation.
     def plot_imputed_values(self, data_table, names, col, *values):
 
         xfmt = md.DateFormatter('%H:%M')
 
-        # Create proper subplots.
         if len(values) > 0:
             f, xar = plt.subplots(len(values) + 1, sharex=True, sharey=False)
         else:
@@ -473,40 +394,31 @@ class VisualizeDataset:
 
         f.subplots_adjust(hspace=0.4)
 
-        # plot the regular dataset.
-
         xar[0].xaxis.set_major_formatter(xfmt)
-        xar[0].plot(data_table.index[data_table[col].notnull()], data_table[col][data_table[col].notnull()], 'b+', markersize='2')
-        xar[0].legend([names[0]], fontsize='small', numpoints=1, loc='upper center',  bbox_to_anchor=(0.5, 1.3), ncol=1, fancybox=True, shadow=True)
+        xar[0].plot(data_table.index[data_table[col].notnull()], data_table[col][data_table[col].notnull()], 'b+',
+                    markersize='2')
+        xar[0].legend([names[0]], fontsize='small', numpoints=1, loc='upper center', bbox_to_anchor=(0.5, 1.3), ncol=1,
+                      fancybox=True, shadow=True)
 
-        # and plot the others that have resulted from imputation.
-        for i in range(1, len(values)+1):
+        for i in range(1, len(values) + 1):
             xar[i].xaxis.set_major_formatter(xfmt)
-            xar[i].plot(data_table.index, values[i-1], 'b+', markersize='2')
-            xar[i].legend([names[i]], fontsize='small', numpoints=1, loc='upper center',  bbox_to_anchor=(0.5, 1.3), ncol=1, fancybox=True, shadow=True)
+            xar[i].plot(data_table.index, values[i - 1], 'b+', markersize='2')
+            xar[i].legend([names[i]], fontsize='small', numpoints=1, loc='upper center', bbox_to_anchor=(0.5, 1.3),
+                          ncol=1, fancybox=True, shadow=True)
 
-        # Diplay is nicely in subplots.
         plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
         plt.xlabel('time')
         self.save(plt)
         plt.close('all')
-        
 
-    # This function plots clusters that result from the application of a clustering algorithm
-    # and also shows the class label of points. Clusters are displayed via colors, classes
-    # by means of different types of points. We assume that three data columns are clustered
-    # that do not include the label. We assume the labels to be represented by 1 or more binary
-    # columns.
     def plot_clusters_3d(self, data_table, data_cols, cluster_col, label_cols):
 
         color_index = 0
         point_displays = ['+', 'x', '*', 'd', 'o', 's', '<', '>']
 
-        # Determine the number of clusters:
         clusters = data_table[cluster_col].unique()
         labels = []
 
-        # Get the possible labels, assuming 1 or more label columns with binary values.
         for i in range(0, len(label_cols)):
             labels.extend([name for name in list(data_table.columns) if label_cols[i] == name[0:len(label_cols[i])]])
 
@@ -514,18 +426,16 @@ class VisualizeDataset:
         ax = fig.add_subplot(111, projection='3d')
         handles = []
 
-        # Plot clusters individually with a certain color.
         for cluster in clusters:
             marker_index = 0
-            # And make sure the points of a label receive the right marker type.
             for label in labels:
                 rows = data_table.loc[(data_table[cluster_col] == cluster) & (data_table[label] > 0)]
-                # Now we come to the assumption that there are three data_cols specified:
                 if not len(data_cols) == 3:
                     return
-                plot_color = self.colors[color_index%len(self.colors)]
-                plot_marker = point_displays[marker_index%len(point_displays)]
-                pt = ax.scatter(rows[data_cols[0]], rows[data_cols[1]], rows[data_cols[2]], c=plot_color, marker=plot_marker)
+                plot_color = self.colors[color_index % len(self.colors)]
+                plot_marker = point_displays[marker_index % len(point_displays)]
+                pt = ax.scatter(rows[data_cols[0]], rows[data_cols[1]], rows[data_cols[2]], c=plot_color,
+                                marker=plot_marker)
                 if color_index == 0:
                     handles.append(pt)
                 ax.set_xlabel(data_cols[0])
@@ -538,22 +448,14 @@ class VisualizeDataset:
         self.save(plt)
         plt.close('all')
 
-    # This function plots the silhouettes of the different clusters that have been identified. It plots the
-    # silhouette of the individual datapoints per cluster to allow studying the clusters internally as well.
-    # For this, a column expressing the silhouette for each datapoint is assumed.
     def plot_silhouette(self, data_table, cluster_col, silhouette_col):
-        # Taken from the examples of scikit learn
-        #(http://scikit-learn.org/stable/auto_examples/cluster/plot_kmeans_silhouette_analysis.html)
 
         clusters = data_table[cluster_col].unique()
 
         fig, ax1 = plt.subplots(1, 1)
         ax1.set_xlim([-0.1, 1])
-        #ax1.set_ylim([0, len(data_table.index) + (len(clusters) + 1) * 10])
         y_lower = 10
         for i in range(0, len(clusters)):
-            # Aggregate the silhouette scores for samples belonging to
-            # cluster i, and sort them
             rows = data_table.mask(data_table[cluster_col] != clusters[i])
             ith_cluster_silhouette_values = np.array(rows[silhouette_col])
             ith_cluster_silhouette_values.sort()
@@ -563,47 +465,37 @@ class VisualizeDataset:
 
             color = plt.get_cmap('Spectral')(float(i) / len(clusters))
             ax1.fill_betweenx(np.arange(y_lower, y_upper),
-                          0, ith_cluster_silhouette_values,
-                          facecolor=color, edgecolor=color, alpha=0.7)
+                              0, ith_cluster_silhouette_values,
+                              facecolor=color, edgecolor=color, alpha=0.7)
 
-            # Label the silhouette plots with their cluster numbers at the middle
             ax1.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i))
 
-            # Compute the new y_lower for next plot
-            y_lower = y_upper + 10  # 10 for the 0 samples
+            y_lower = y_upper + 10
 
         ax1.set_title("The silhouette plot for the various clusters.")
         ax1.set_xlabel("The silhouette coefficient values")
         ax1.set_ylabel("Cluster label")
 
-        # The vertical line for average silhouette score of all the values
         ax1.axvline(x=data_table[silhouette_col].mean(), color="red", linestyle="--")
 
-        ax1.set_yticks([])  # Clear the yaxis labels / ticks
+        ax1.set_yticks([])
         ax1.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
         self.save(plt)
         plt.close('all')
 
-    # Plot a dendorgram for hierarchical clustering. It assumes that the linkage as
-    # used in sk learn is passed as an argument as well.
     def plot_dendrogram(self, dataset, linkage):
         sys.setrecursionlimit(40000)
         plt.title('Hierarchical Clustering Dendrogram')
         plt.xlabel('time points')
         plt.ylabel('distance')
         times = dataset.index.strftime('%H:%M:%S')
-        #dendrogram(linkage,truncate_mode='lastp',p=10, show_leaf_counts=True, leaf_rotation=90.,leaf_font_size=12.,show_contracted=True, labels=times)
-        dendrogram(linkage,truncate_mode='lastp',p=16, show_leaf_counts=True, leaf_rotation=45.,leaf_font_size=8.,show_contracted=True, labels=times)
+        dendrogram(linkage, truncate_mode='lastp', p=16, show_leaf_counts=True, leaf_rotation=45., leaf_font_size=8.,
+                   show_contracted=True, labels=times)
         self.save(plt)
         plt.close('all')
 
-    # Plot the confusion matrix that has been derived in the evaluation metrics. Classes expresses the labels
-    # for the matrix. We can normalize or show the raw counts. Of course this applies to classification problems.
     def plot_confusion_matrix(self, cm, classes, normalize=False):
-        # Taken from http://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html
-
-        # Select the colormap.
-        cmap=plt.cm.Blues
+        cmap = plt.cm.Blues
         plt.imshow(cm, interpolation='nearest', cmap=cmap)
         plt.title('confusion matrix')
         plt.colorbar()
@@ -624,13 +516,10 @@ class VisualizeDataset:
         self.save(plt)
         plt.close('all')
 
-    # This function plots the predictions or an algorithms (both for the training and test set) versus the real values for
-    # a regression problem. It assumes only a single value to be predicted over a number of cases. The variables identified
-    # with reg_ are the predictions.
-    def plot_numerical_prediction_versus_real(self, train_time, train_y, regr_train_y, test_time, test_y, regr_test_y, label):
+    def plot_numerical_prediction_versus_real(self, train_time, train_y, regr_train_y, test_time, test_y, regr_test_y,
+                                              label):
         self.legends = {}
 
-        # Plot the values, training set cases in blue, test set in red.
         f, xar = plt.subplots(1, 1)
 
         xfmt = md.DateFormatter('%H:%M')
@@ -642,29 +531,31 @@ class VisualizeDataset:
         plt.plot(test_time, test_y, '-', linewidth=0.5)
         plt.plot(test_time, regr_test_y, '--', linewidth=0.5)
 
-        plt.legend(['real values training', 'predicted values training', 'real values test', 'predicted values test'], loc=4)
+        plt.legend(['real values training', 'predicted values training', 'real values test', 'predicted values test'],
+                   loc=4)
 
-
-        # And create some fancy stuff in the figure to label the training and test set a bit clearer.
-        max_y_value = max(max(train_y.tolist()), max(regr_train_y.tolist()), max(test_y.tolist()), max(regr_test_y.tolist()))
-        min_y_value = min(min(train_y.tolist()), min(regr_train_y.tolist()), min(test_y.tolist()), min(regr_test_y.tolist()))
+        max_y_value = max(max(train_y.tolist()), max(regr_train_y.tolist()), max(test_y.tolist()),
+                          max(regr_test_y.tolist()))
+        min_y_value = min(min(train_y.tolist()), min(regr_train_y.tolist()), min(test_y.tolist()),
+                          min(regr_test_y.tolist()))
         range = max_y_value - min_y_value
-        y_coord_labels = max(max(train_y.tolist()), max(regr_train_y.tolist()), max(test_y.tolist()), max(regr_test_y.tolist()))+(0.01*range)
-
+        y_coord_labels = max(max(train_y.tolist()), max(regr_train_y.tolist()), max(test_y.tolist()),
+                             max(regr_test_y.tolist())) + (0.01 * range)
 
         plt.title('Performance of model for ' + str(label))
         plt.ylabel(label)
         plt.xlabel('time')
-        plt.annotate('', xy=(train_time[0],y_coord_labels), xycoords='data', xytext=(train_time[-1], y_coord_labels), textcoords='data', arrowprops={'arrowstyle': '<->'})
-        plt.annotate('training set', xy=(train_time[int(float(len(train_time))/2)], y_coord_labels*1.02), color='blue', xycoords='data', ha='center')
-        plt.annotate('', xy=(test_time[0], y_coord_labels), xycoords='data', xytext=(test_time[-1], y_coord_labels), textcoords='data', arrowprops={'arrowstyle': '<->'})
-        plt.annotate('test set', xy=(test_time[int(float(len(test_time))/2)], y_coord_labels*1.02), color='red', xycoords='data', ha='center')
+        plt.annotate('', xy=(train_time[0], y_coord_labels), xycoords='data', xytext=(train_time[-1], y_coord_labels),
+                     textcoords='data', arrowprops={'arrowstyle': '<->'})
+        plt.annotate('training set', xy=(train_time[int(float(len(train_time)) / 2)], y_coord_labels * 1.02),
+                     color='blue', xycoords='data', ha='center')
+        plt.annotate('', xy=(test_time[0], y_coord_labels), xycoords='data', xytext=(test_time[-1], y_coord_labels),
+                     textcoords='data', arrowprops={'arrowstyle': '<->'})
+        plt.annotate('test set', xy=(test_time[int(float(len(test_time)) / 2)], y_coord_labels * 1.02), color='red',
+                     xycoords='data', ha='center')
         self.save(plt)
         plt.close('all')
 
-    # Plot the Pareto front for multi objective optimization problems (for the dynamical systems stuff). We consider the
-    # raw output of the MO dynamical systems approach, which includes rows with the fitness and predictions for the training
-    # and test set. We select the fitness and plot them in a graph. Note that the plot only considers the first two dimensions.
     def plot_pareto_front(self, dynsys_output):
         fit_1_train = []
         fit_2_train = []
@@ -677,24 +568,21 @@ class VisualizeDataset:
         plt.scatter(fit_1_train, fit_2_train, color='r')
         plt.xlabel('mse on ' + str(dynsys_output[0][0].columns[0]))
         plt.ylabel('mse on ' + str(dynsys_output[0][0].columns[1]))
-        #plt.savefig('{0} Example ({1}).pdf'.format(ea.__class__.__name__, problem.__class__.__name__), format='pdf')
         self.save(plt)
         plt.close('all')
 
-    # Plot a prediction for a regression model in case it concerns a multi-objective dynamical systems model. Here, we plot
-    # the individual specified. Again, the complete output of the MO approach is used as argument.
-    def plot_numerical_prediction_versus_real_dynsys_mo(self, train_time, train_y, test_time, test_y, dynsys_output, individual, label):
+    def plot_numerical_prediction_versus_real_dynsys_mo(self, train_time, train_y, test_time, test_y, dynsys_output,
+                                                        individual, label):
         regr_train_y = dynsys_output[individual][0][label]
         regr_test_y = dynsys_output[individual][2][label]
         train_y = train_y[label]
         test_y = test_y[label]
-        self.plot_numerical_prediction_versus_real(train_time, train_y, regr_train_y, test_time, test_y, regr_test_y, label)
+        self.plot_numerical_prediction_versus_real(train_time, train_y, regr_train_y, test_time, test_y, regr_test_y,
+                                                   label)
 
-    # Visualizes the performance of different algorithms over different feature sets. Assumes the scores to contain
-    # a score on the training set followed by an sd, and the same for the test set.
     def plot_performances(self, algs, feature_subset_names, scores_over_all_algs, ylim, std_mult, y_name):
 
-        width = float(1)/(len(feature_subset_names)+1)
+        width = float(1) / (len(feature_subset_names) + 1)
         ind = np.arange(len(algs))
         for i in range(0, len(feature_subset_names)):
             means = []
@@ -702,9 +590,9 @@ class VisualizeDataset:
             for j in range(0, len(algs)):
                 means.append(scores_over_all_algs[i][j][2])
                 std.append(std_mult * scores_over_all_algs[i][j][3])
-            plt.errorbar(ind + i * width, means, yerr=std, fmt=self.colors[i%len(self.colors)] + 'o', markersize='3')
+            plt.errorbar(ind + i * width, means, yerr=std, fmt=self.colors[i % len(self.colors)] + 'o', markersize='3')
         plt.ylabel(y_name)
-        plt.xticks(ind+(float(len(feature_subset_names))/2)*width, algs)
+        plt.xticks(ind + (float(len(feature_subset_names)) / 2) * width, algs)
         plt.legend(feature_subset_names, loc=4, numpoints=1)
         if not ylim is None:
             plt.ylim(ylim)

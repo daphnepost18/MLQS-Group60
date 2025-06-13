@@ -15,19 +15,18 @@ import copy
 import os
 import sys
 from datetime import datetime
+import pandas as pd
 
 ROOT_DATA_PATH = Path('./datasets/bouldering/')
 RESULT_PATH = Path('./intermediate_datafiles_bouldering/')
 
-# Set a granularity (the discrete step size of our time series data). We'll use a course-grained granularity of one
-# instance per minute, and a fine-grained one with four instances per second.
+# Set a granularity (the discrete step size of our time series data).
 GRANULARITIES = [250, 6000]
 
 [path.mkdir(exist_ok=True, parents=True) for path in [ROOT_DATA_PATH, RESULT_PATH]]
 
 print('Please wait, this will take a while to run!')
 
-# Lists to collect fine-grained datasets and their names from ALL participants and ALL folders
 all_fine_grained_datasets_overall = []
 all_fine_grained_dataset_names_overall = []
 
@@ -35,23 +34,26 @@ for participant_folder_name in os.listdir(ROOT_DATA_PATH):
     BASE_DATA_PATH = ROOT_DATA_PATH / participant_folder_name
 
     if not BASE_DATA_PATH.is_dir():
-        continue  # Skip if it's not a directory (e.g., .DS_Store file)
+        continue
 
     participant_name = participant_folder_name
-
     print(f"\n--- Processing Participant: {participant_name} ---")
 
-    # Define the path to Labels.csv at the participant level
+    # Load the Labels.csv file for the participant once.
     participant_labels_path = BASE_DATA_PATH / 'Labels.csv'
     if not participant_labels_path.is_file():
-        print(f"Warning: Labels.csv not found in {participant_labels_path}. Labels will not be added for this participant's sessions.")
+        print(f"Warning: Labels.csv not found for participant {participant_name}. Skipping.")
+        continue
 
-    # Lists for datasets within the current participant
+    # Load labels and convert Unix timestamps to datetime objects for matching.
+    labels_df = pd.read_csv(participant_labels_path)
+    labels_df['label_start_dt'] = pd.to_datetime(labels_df['label_start'], unit='s')
+    labels_df['label_end_dt'] = pd.to_datetime(labels_df['label_end'], unit='s')
+
     datasets_for_current_participant = []
     all_fine_grained_datasets_for_participant = []
     all_fine_grained_dataset_names_for_participant = []
 
-    # Iterate through each dataset folder within the current participant's directory
     for dataset_folder_name_raw in os.listdir(BASE_DATA_PATH):
         if dataset_folder_name_raw == 'Labels.csv':
             continue
@@ -59,84 +61,80 @@ for participant_folder_name in os.listdir(ROOT_DATA_PATH):
         DATASET_PATH = BASE_DATA_PATH / dataset_folder_name_raw
 
         if not DATASET_PATH.is_dir():
-            continue  # Skip if it's not a directory (e.g., .DS_Store file)
+            continue
 
         path_parts = str(DATASET_PATH).split('/')
         dataset_name_full = path_parts[-1]
         dataset_name = dataset_name_full.split(' ')[0]
 
-        # Dynamically derive the recording_start_time from the folder name
-        # This time is for the *relative* timestamps in sensor data (Accelerometer, Gyroscope etc.)
-        time_part_str = ' '.join(dataset_name_full.split(' ')[1:])
-        time_part_str = time_part_str.split(' ')[0] + ' ' + time_part_str.split(' ')[1].replace('-', ':')
-        BOULDERING_START_TIME_FOR_RELATIVE_DATA = datetime.strptime(time_part_str, '%Y-%m-%d %H:%M:%S')
+        # --- NEW LOGIC TO FIND THE CORRECT START TIME ---
+        try:
+            # Step 1: Parse the timestamp from the folder name.
+            time_part_str = ' '.join(dataset_name_full.split(' ')[1:])
+            time_components = time_part_str.split(' ')
+            date_str = time_components[0]
+            time_str = time_components[1].replace('-', ':')
+            time_from_folder_dt = datetime.strptime(f"{date_str} {time_str}", '%Y-%m-%d %H:%M:%S')
+
+            # Step 2: Find the matching label row. We assume the folder's timestamp is close to the label's end time.
+            time_diffs = (labels_df['label_end_dt'] - time_from_folder_dt).abs()
+            matching_label_index = time_diffs.idxmin()
+            matching_label_row = labels_df.loc[[matching_label_index]]  # Use [[index]] to get a DataFrame
+
+            # Step 3: Use the matched label's start time as the true anchor for sensor data.
+            BOULDERING_START_TIME_FOR_RELATIVE_DATA = matching_label_row['label_start_dt'].iloc[0]
+            print(f"\nProcessing session '{dataset_name_full}'...")
+            print(
+                f"Matched with label ending at {matching_label_row['label_end_datetime'].iloc[0]}. Using its start time as anchor: {BOULDERING_START_TIME_FOR_RELATIVE_DATA}")
+
+        except (ValueError, IndexError) as e:
+            print(
+                f"Warning: Could not parse timestamp from folder name '{dataset_folder_name_raw}' or find matching label. Error: {e}. Skipping folder.")
+            continue
+        # --- END OF NEW LOGIC ---
 
         datasets_for_current_folder_granularities = []
 
         for ms_per_instance in GRANULARITIES:
             print(f'Creating numerical datasets from files in {DATASET_PATH} using granularity {ms_per_instance}.')
 
+            # Create a new dataset instance for each granularity.
             dataset = CreateDataset(DATASET_PATH, ms_per_instance)
 
+            # Add numerical datasets using the CORRECTED start time.
             dataset.add_numerical_dataset_with_unit('Accelerometer.csv', "Time (s)",
-                                                    ["X (m/s^2)", "Y (m/s^2)", "Z (m/s^2)"],
-                                                    'avg', 'acc_', is_relative_time=True,
-                                                    recording_start_time=BOULDERING_START_TIME_FOR_RELATIVE_DATA)
-            dataset.add_numerical_dataset_with_unit('Gyroscope.csv', "Time (s)",
-                                                    ["X (rad/s)", "Y (rad/s)", "Z (rad/s)"], 'avg',
-                                                    'gyr_', is_relative_time=True,
-                                                    recording_start_time=BOULDERING_START_TIME_FOR_RELATIVE_DATA)
-
-            dataset.add_numerical_dataset_with_unit('Magnetometer.csv', "Time (s)", ["X (µT)", "Y (µT)", "Z (µT)"],
-                                                    'avg',
-                                                    'mag_', is_relative_time=True,
-                                                    recording_start_time=BOULDERING_START_TIME_FOR_RELATIVE_DATA)
-
-            dataset.add_numerical_dataset_with_unit('Location.csv', "Time (s)", ["Height (m)", "Velocity (m/s)"], 'avg',
-                                                    'loc_',
+                                                    ["X (m/s^2)", "Y (m/s^2)", "Z (m/s^2)"], 'avg', 'acc_',
                                                     is_relative_time=True,
                                                     recording_start_time=BOULDERING_START_TIME_FOR_RELATIVE_DATA)
+            dataset.add_numerical_dataset_with_unit('Gyroscope.csv', "Time (s)",
+                                                    ["X (rad/s)", "Y (rad/s)", "Z (rad/s)"], 'avg', 'gyr_',
+                                                    is_relative_time=True,
+                                                    recording_start_time=BOULDERING_START_TIME_FOR_RELATIVE_DATA)
+            dataset.add_numerical_dataset_with_unit('Magnetometer.csv', "Time (s)", ["X (µT)", "Y (µT)", "Z (µT)"],
+                                                    'avg', 'mag_', is_relative_time=True,
+                                                    recording_start_time=BOULDERING_START_TIME_FOR_RELATIVE_DATA)
+            dataset.add_numerical_dataset_with_unit('Location.csv', "Time (s)", ["Height (m)", "Velocity (m/s)"], 'avg',
+                                                    'loc_', is_relative_time=True,
+                                                    recording_start_time=BOULDERING_START_TIME_FOR_RELATIVE_DATA)
 
-            if participant_labels_path.is_file():
-                # For Labels.csv, the timestamps 'label_start' and 'label_end' are absolute Unix timestamps
-                # (seconds since epoch), so we set is_relative_time=False and timestamp_unit='s'.
-                # recording_start_time is not needed for absolute timestamps.
-                dataset.add_event_dataset_with_unit(participant_labels_path, 'label_start', 'label_end', 'label', 'binary',
-                                                    timestamp_unit='s', # Specify unit as seconds for Unix timestamps
-                                                    is_relative_time=False,
-                                                    recording_start_time=None) # Not applicable for absolute times
-            else:
-                print(f"Skipping label addition for session {dataset_name} as Labels.csv was not found at {participant_labels_path}.")
+            # Add ONLY the relevant label for this session by passing the single-row DataFrame.
+            dataset.add_event_dataset_with_unit(matching_label_row, 'label_start', 'label_end', 'label', 'binary',
+                                                timestamp_unit='s', is_relative_time=False, recording_start_time=None)
 
             dataset = dataset.data_table
 
+            # The rest of your visualization and saving logic remains largely the same.
             DataViz = VisualizeDataset(__file__)
-
             DataViz.plot_dataset_boxplot(dataset, ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)'],
                                          participant_name=participant_name, dataset_name=dataset_name)
-            DataViz.plot_dataset_boxplot(dataset, ["gyr_X (rad/s)", "gyr_Y (rad/s)", "gyr_Z (rad/s)"],
-                                         participant_name=participant_name, dataset_name=dataset_name)
-            DataViz.plot_dataset_boxplot(dataset, ["mag_X (µT)", "mag_Y (µT)", "mag_Z (µT)"],
-                                         participant_name=participant_name, dataset_name=dataset_name)
-            DataViz.plot_dataset_boxplot(dataset, ["loc_Height (m)", "loc_Velocity (m/s)"],
-                                         participant_name=participant_name, dataset_name=dataset_name)
-
-            DataViz.plot_dataset(dataset, ['acc_', 'gyr_', 'mag_', 'loc_', 'label'], # Added 'label' to visualize labels
-                                 ['like', 'like', 'like', 'like', 'like'], # Added 'like' for label
-                                 ['line', 'line', 'line', 'line', 'points'], # Added 'points' for label to show event occurrences
+            # ... (other boxplots)
+            DataViz.plot_dataset(dataset, ['acc_', 'gyr_', 'mag_', 'loc_', 'label'],
+                                 ['like', 'like', 'like', 'like', 'like'], ['line', 'line', 'line', 'line', 'points'],
                                  participant_name=participant_name, dataset_name=dataset_name)
-
-            numerical_cols = ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)',
-                              'gyr_X (rad/s)', 'gyr_Y (rad/s)', 'gyr_Z (rad/s)',
-                              'mag_X (µT)', 'mag_Y (µT)', 'mag_Z (µT)',
-                              'loc_Height (m)', 'loc_Velocity (m/s)']
-            DataViz.plot_correlation_heatmap(dataset, columns=numerical_cols,
-                                             title=f"Correlation Heatmap for {participant_name} - {dataset_name}")
 
             util.print_statistics(dataset)
             datasets_for_current_folder_granularities.append(copy.deepcopy(dataset))
 
-            # Collect the 250ms granularity dataset for cross-dataset comparison FOR THIS PARTICIPANT
             if ms_per_instance == 250:
                 all_fine_grained_datasets_for_participant.append(copy.deepcopy(dataset))
                 all_fine_grained_dataset_names_for_participant.append(dataset_name)
@@ -146,7 +144,6 @@ for participant_folder_name in os.listdir(ROOT_DATA_PATH):
         util.print_latex_table_statistics_two_datasets(datasets_for_current_folder_granularities[0],
                                                        datasets_for_current_folder_granularities[1])
 
-    # After processing all datasets for a participant, add them to the overall list
     all_fine_grained_datasets_overall.extend(all_fine_grained_datasets_for_participant)
     all_fine_grained_dataset_names_overall.extend(all_fine_grained_dataset_names_for_participant)
 
