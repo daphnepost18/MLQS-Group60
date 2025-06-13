@@ -23,13 +23,12 @@ mpl.use('Agg')
 
 
 class VisualizeDataset:
-    point_displays = ['+', 'x']  # '*', 'd', 'o', 's', '<', '>']
-    line_displays = ['-']  # , '--', ':', '-.']
+    point_displays = ['+', 'x']
+    line_displays = ['-']
     colors = ['r', 'g', 'b', 'c', 'm', 'y', 'k']
 
     def __init__(self, module_path='.py'):
         subdir = Path(module_path).name.split('.')[0]
-
         self.plot_number = 1
         self.figures_dir = Path('figures') / subdir
         self.figures_dir.mkdir(exist_ok=True, parents=True)
@@ -37,13 +36,41 @@ class VisualizeDataset:
     def save(self, plot_obj, format='png', prefix=None):
         prefix = f"{prefix}_" if prefix else ""
         fig_name = f'{prefix}fig{self.plot_number}'
-
         save_path = self.figures_dir / f'{fig_name}.{format}'
         plot_obj.savefig(save_path)
         print(f'Figure saved to {save_path}')
-
         self.plot_number += 1
 
+    # ... (no changes to other methods, only plot_dataset_boxplot is modified)
+
+    def plot_dataset_boxplot(self, dataset, cols, participant_name=None, dataset_name=None):
+        # FIX: Changed plt.Figure() to plt.figure() to ensure a new figure is created for each plot.
+        plt.figure()
+        dataset[cols].plot.box()
+
+        title_str = ""
+        if participant_name and dataset_name:
+            title_str = f"Boxplot for Participant: {participant_name}, Dataset: {dataset_name}"
+        elif participant_name:
+            title_str = f"Boxplot for Participant: {participant_name}"
+        elif dataset_name:
+            title_str = f"Boxplot for Dataset: {dataset_name}"
+
+        if title_str:
+            plt.title(title_str, fontsize=14)
+
+        file_prefix = None
+        if participant_name and dataset_name:
+            file_prefix = f"boxplot_{participant_name.replace(' ', '_')}_{dataset_name.replace(' ', '_')}"
+        elif participant_name:
+            file_prefix = f"boxplot_{participant_name.replace(' ', '_')}"
+        elif dataset_name:
+            file_prefix = f"boxplot_{dataset_name.replace(' ', '_')}"
+
+        self.save(plt, prefix=file_prefix)
+        plt.close('all')
+
+    # ... (The rest of the file remains the same)
     def plot_dataset(self, data_table, columns, match='like', display='line', participant_name=None, dataset_name=None):
         data_table.index = pd.to_datetime(data_table.index)
         names = list(data_table.columns)
@@ -147,32 +174,6 @@ class VisualizeDataset:
             if names is not None: plt.legend(names)
 
         self.save(plt)
-        plt.close('all')
-
-    def plot_dataset_boxplot(self, dataset, cols, participant_name=None, dataset_name=None):
-        plt.Figure();
-        dataset[cols].plot.box()
-
-        title_str = ""
-        if participant_name and dataset_name:
-            title_str = f"Boxplot for Participant: {participant_name}, Dataset: {dataset_name}"
-        elif participant_name:
-            title_str = f"Boxplot for Participant: {participant_name}"
-        elif dataset_name:
-            title_str = f"Boxplot for Dataset: {dataset_name}"
-
-        if title_str:
-            plt.title(title_str, fontsize=14)
-
-        file_prefix = None
-        if participant_name and dataset_name:
-            file_prefix = f"boxplot_{participant_name.replace(' ', '_')}_{dataset_name.replace(' ', '_')}"
-        elif participant_name:
-            file_prefix = f"boxplot_{participant_name.replace(' ', '_')}"
-        elif dataset_name:
-            file_prefix = f"boxplot_{dataset_name.replace(' ', '_')}"
-
-        self.save(plt, prefix=file_prefix)
         plt.close('all')
 
     def plot_feature_distributions_across_datasets(self, datasets, feature_cols, dataset_labels, main_title=None):
