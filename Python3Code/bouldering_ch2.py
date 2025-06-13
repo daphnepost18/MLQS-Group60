@@ -21,7 +21,7 @@ RESULT_PATH = Path('./intermediate_datafiles_bouldering/')
 
 # Set a granularity (the discrete step size of our time series data). We'll use a course-grained granularity of one
 # instance per minute, and a fine-grained one with four instances per second.
-GRANULARITIES = [250, 1000]
+GRANULARITIES = [250, 6000]
 
 [path.mkdir(exist_ok=True, parents=True) for path in [ROOT_DATA_PATH, RESULT_PATH]]
 
@@ -53,7 +53,6 @@ for participant_folder_name in os.listdir(ROOT_DATA_PATH):
 
     # Iterate through each dataset folder within the current participant's directory
     for dataset_folder_name_raw in os.listdir(BASE_DATA_PATH):
-        # Skip Labels.csv itself when iterating through dataset folders
         if dataset_folder_name_raw == 'Labels.csv':
             continue
 

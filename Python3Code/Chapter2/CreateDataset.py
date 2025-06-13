@@ -145,16 +145,19 @@ class CreateDataset:
             # Convert timestamp column to float to perform arithmetic operations
             dataset[timestamp_col] = dataset[timestamp_col].astype(float)
 
-            # Shift timestamps so the earliest one in this file becomes 0
-            min_ts_in_file = dataset[timestamp_col].min()
-            dataset[timestamp_col] = dataset[timestamp_col] - min_ts_in_file
+            if recording_start_time is not None:
+                # If recording_start_time is provided, the timestamps in the file are already relative
+                # to this specific start time. Use it as the origin directly.
+                origin_time = recording_start_time
+            else:
+                # If recording_start_time is NOT provided, it means the timestamps are relative to
+                # an unknown start within this file. Re-baseline them to 0 and use an arbitrary origin.
+                min_ts_in_file = dataset[timestamp_col].min()
+                dataset[timestamp_col] = dataset[timestamp_col] - min_ts_in_file
+                origin_time = datetime(2025, 1, 1, 0, 0, 0) # Arbitrary start date
 
-            # If recording_start_time is not provided, use an arbitrary default for the origin
-            if recording_start_time is None:
-                recording_start_time = datetime(2025, 1, 1, 0, 0, 0)  # Arbitrary start date
-
-            # Convert the 0-based relative seconds to absolute datetimes using the recording_start_time as origin
-            dataset[timestamp_col] = pd.to_datetime(dataset[timestamp_col], unit='s', origin=recording_start_time)
+            # Convert the relative seconds to absolute datetimes using the chosen origin
+            dataset[timestamp_col] = pd.to_datetime(dataset[timestamp_col], unit='s', origin=origin_time)
         else:
             # This is the original logic for absolute timestamps (e.g., crowdsignals)
             if timestamp_unit:
@@ -222,22 +225,24 @@ class CreateDataset:
             dataset[start_timestamp_col] = dataset[start_timestamp_col].astype(float)
             dataset[end_timestamp_col] = dataset[end_timestamp_col].astype(float)
 
-            # Determine the overall minimum timestamp across both start and end times in this file
-            min_ts_start = dataset[start_timestamp_col].min()
-            min_ts_end = dataset[end_timestamp_col].min()
-            min_ts_in_file = min(min_ts_start, min_ts_end)
+            if recording_start_time is not None:
+                # If recording_start_time is provided, the timestamps in the file are already relative
+                # to this specific start time. Use it as the origin directly.
+                origin_time = recording_start_time
+            else:
+                # If recording_start_time is NOT provided, it means the timestamps are relative to
+                # an unknown start within this file. Re-baseline them to 0 and use an arbitrary origin.
+                min_ts_start = dataset[start_timestamp_col].min()
+                min_ts_end = dataset[end_timestamp_col].min()
+                min_ts_in_file = min(min_ts_start, min_ts_end) # Get overall min for re-baselining
 
-            # Shift timestamps so the earliest one in this file becomes 0
-            dataset[start_timestamp_col] = dataset[start_timestamp_col] - min_ts_in_file
-            dataset[end_timestamp_col] = dataset[end_timestamp_col] - min_ts_in_file
+                dataset[start_timestamp_col] = dataset[start_timestamp_col] - min_ts_in_file
+                dataset[end_timestamp_col] = dataset[end_timestamp_col] - min_ts_in_file
+                origin_time = datetime(2025, 1, 1, 0, 0, 0) # Arbitrary start date
 
-            # If recording_start_time is not provided, use an arbitrary default for the origin
-            if recording_start_time is None:
-                recording_start_time = datetime(2025, 1, 1, 0, 0, 0) # Arbitrary start date
-
-            # Convert the 0-based relative seconds to absolute datetimes using the recording_start_time as origin
-            dataset[start_timestamp_col] = pd.to_datetime(dataset[start_timestamp_col], unit='s', origin=recording_start_time)
-            dataset[end_timestamp_col] = pd.to_datetime(dataset[end_timestamp_col], unit='s', origin=recording_start_time)
+            # Convert the relative seconds to absolute datetimes using the chosen origin
+            dataset[start_timestamp_col] = pd.to_datetime(dataset[start_timestamp_col], unit='s', origin=origin_time)
+            dataset[end_timestamp_col] = pd.to_datetime(dataset[end_timestamp_col], unit='s', origin=origin_time)
         else:
             # This is the original logic for absolute timestamps (e.g., crowdsignals)
             if timestamp_unit:
