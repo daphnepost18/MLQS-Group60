@@ -41,8 +41,6 @@ class VisualizeDataset:
         print(f'Figure saved to {save_path}')
         self.plot_number += 1
 
-    # ... (no changes to other methods, only plot_dataset_boxplot is modified)
-
     def plot_dataset_boxplot(self, dataset, cols, participant_name=None, dataset_name=None):
         # FIX: Changed plt.Figure() to plt.figure() to ensure a new figure is created for each plot.
         plt.figure()
@@ -70,7 +68,6 @@ class VisualizeDataset:
         self.save(plt, prefix=file_prefix)
         plt.close('all')
 
-    # ... (The rest of the file remains the same)
     def plot_dataset(self, data_table, columns, match='like', display='line', participant_name=None, dataset_name=None):
         data_table.index = pd.to_datetime(data_table.index)
         names = list(data_table.columns)
@@ -83,7 +80,8 @@ class VisualizeDataset:
 
         f.subplots_adjust(hspace=0.4)
 
-        xfmt = md.DateFormatter('%H:%M:%S.%f')
+        # FIX: Changed the format string to '%H:%M:%S' to remove milliseconds.
+        xfmt = md.DateFormatter('%H:%M:%S')
 
         for i in range(0, len(columns)):
             xar[i].xaxis.set_major_formatter(xfmt)
