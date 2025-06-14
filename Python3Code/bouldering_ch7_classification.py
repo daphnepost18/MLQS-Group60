@@ -31,16 +31,13 @@ from util import util
 from util.VisualizeDataset import VisualizeDataset
 
 # Read the result from the previous chapter, and make sure the index is of the type datetime.
-# --- MODIFICATION START ---
-DATA_PATH = Path('./intermediate_datafiles_bouldering/') # Adjusted to bouldering path
-# Original DATASET_FNAME and RESULT_FNAME are now effectively handled dynamically per file.
-DATASET_FNAME = 'chapter5_result.csv' # Kept for original structure, but not actively used for loading
-RESULT_FNAME = 'chapter7_classification_result.csv' # Kept for original structure, but not actively used for saving final output
-# --- MODIFICATION END ---
-EXPORT_TREE_BASE_PATH = Path('./figures/crowdsignals_ch7_classification/') # Base path for saving trees
+DATA_PATH = Path('./intermediate_datafiles_bouldering/')
+DATASET_FNAME = 'chapter5_result.csv'
+RESULT_FNAME = 'chapter7_classification_result.csv'
+EXPORT_TREE_BASE_PATH = Path('./figures/crowdsignals_ch7_classification/')
 
-# Next, we declare the parameters we'll use in the algorithms.
-N_FORWARD_SELECTION = 10 # Reduced for potentially faster execution, adjust as needed
+
+N_FORWARD_SELECTION = 50
 
 def print_flags():
     """
@@ -49,8 +46,6 @@ def print_flags():
     for key, value in vars(FLAGS).items():
         print(key + ' : ' + str(value))
 
-# --- MODIFICATION START ---
-# Encapsulate the original main logic into a function to process a single dataset
 def process_single_bouldering_dataset(dataset, file_base_identifier, export_tree_base_path):
 
     # Original start time variable, now for individual dataset processing
@@ -71,10 +66,11 @@ def process_single_bouldering_dataset(dataset, file_base_identifier, export_tree
 
     prepare = PrepareDatasetForLearning()
 
-    # Ensure 'label' column exists before splitting, as it's fundamental for classification
-    if 'label' not in dataset.columns:
-        print(f"Skipping processing for this dataset ('{file_base_identifier}'): 'label' column not found. Cannot perform classification.")
-        return # Exit this function for the current dataset
+    # Check for the presence of any of the new label columns (e.g., 'labelEasy', 'labelMedium', etc.).
+    label_cols = [col for col in dataset.columns if col.startswith('label')]
+    if not label_cols:
+        print(f"Skipping processing for this dataset ('{file_base_identifier}'): No label columns found. Cannot perform classification.")
+        return
 
     train_X, test_X, train_y, test_y = prepare.split_single_dataset_classification(dataset, ['label'], 'like', 0.7, filter=True, temporal=False)
 
@@ -418,7 +414,6 @@ def main(): # Re-defined main, as it was missing or incomplete in previous outpu
 
 
 if __name__ == '__main__':
-    # Command line arguments (kept identical to original crowdsignals_ch7_classification structure)
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', type=str, default='final',
                         help="Select what version to run: final (deprecated, script processes all files) \
