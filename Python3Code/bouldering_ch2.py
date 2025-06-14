@@ -161,40 +161,26 @@ print('\nThe code has run through successfully!')
 # NEW CODE: Combine all generated CSV files into a single master file.
 # ---------------------------------------------------------------------------
 print('\nCombining all individual result CSVs into a single file...')
-
-# Define a search pattern to find all the result files saved earlier.
-# This looks for any .csv file starting with 'chapter2_result_' in the result path.
 search_pattern = RESULT_PATH / 'chapter2_result_*.csv'
 all_csv_files = glob.glob(str(search_pattern))
 
-# We need to exclude the final combined file if the script is run more than once.
 final_filename_str = 'chapter2_result_participant1_combined.csv'
 csv_files_to_combine = [f for f in all_csv_files if final_filename_str not in f]
 
 if csv_files_to_combine:
-    # Create a list to hold each loaded DataFrame.
     df_list = []
     for file in csv_files_to_combine:
-        # Read the CSV file. 'index_col=0' is used because pandas saves the
-        # DataFrame index as the first column by default.
         df = pd.read_csv(file, index_col=0)
         df_list.append(df)
 
-    # Concatenate all DataFrames in the list into a single DataFrame.
-    # By omitting 'ignore_index=True', the original indices are preserved.
-    combined_df = pd.concat(df_list)
-
-    # Define the final output file path.
+    combined_df = pd.concat(df_list).sort_index()
     output_path = RESULT_PATH / final_filename_str
-
-    # Save the combined DataFrame to a new CSV file.
     combined_df.to_csv(output_path)
 
-    # Print statistics for the final combined dataframe.
+    print(f'Successfully combined {len(csv_files_to_combine)} files into: {output_path}')
+
     print('\n--- Statistics for the Combined Dataset ---')
     util.print_statistics(combined_df)
 
-    print(f'Successfully combined {len(csv_files_to_combine)} files into:')
-    print(f'{output_path}')
 else:
     print('No individual result files were found to combine.')
