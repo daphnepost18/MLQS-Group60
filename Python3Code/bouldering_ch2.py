@@ -38,19 +38,11 @@ for participant_folder_name in os.listdir(ROOT_DATA_PATH):
     participant_name = participant_folder_name
     print(f"\n--- Processing Participant: {participant_name} ---")
 
-    participant_labels_path = BASE_DATA_PATH / 'Labels.csv'
-    if not participant_labels_path.is_file():
-        print(f"Warning: Labels.csv not found for participant {participant_name}. Skipping.")
-        continue
-
-    labels_df = pd.read_csv(participant_labels_path)
-    labels_df['label_start_dt'] = pd.to_datetime(labels_df['label_start'], unit='s')
-    labels_df['label_end_dt'] = pd.to_datetime(labels_df['label_end'], unit='s')
-
     all_fine_grained_datasets_for_participant = []
     all_fine_grained_dataset_names_for_participant = []
 
     for dataset_folder_name_raw in os.listdir(BASE_DATA_PATH):
+        # We no longer need Labels.csv, so we can skip it.
         if dataset_folder_name_raw == 'Labels.csv':
             continue
 
@@ -61,31 +53,24 @@ for participant_folder_name in os.listdir(ROOT_DATA_PATH):
 
         path_parts = str(DATASET_PATH).split('/')
         dataset_name_full = path_parts[-1]
+        # dataset_name will be 'Easy1', 'Hard2', etc.
         dataset_name = dataset_name_full.split(' ')[0]
+        print(f"\nProcessing session '{dataset_name_full}'...")
 
+        # Revert to using the folder name's timestamp as the start time for sensor data.
         try:
             time_part_str = ' '.join(dataset_name_full.split(' ')[1:])
             time_components = time_part_str.split(' ')
             date_str = time_components[0]
             time_str = time_components[1].replace('-', ':')
-            time_from_folder_dt = datetime.strptime(f"{date_str} {time_str}", '%Y-%m-%d %H:%M:%S')
-
-            time_diffs = (labels_df['label_end_dt'] - time_from_folder_dt).abs()
-            matching_label_index = time_diffs.idxmin()
-            matching_label_row = labels_df.loc[[matching_label_index]]
-
-            BOULDERING_START_TIME_FOR_RELATIVE_DATA = matching_label_row['label_start_dt'].iloc[0]
-            print(f"\nProcessing session '{dataset_name_full}'...")
-            print(
-                f"Matched with label ending at {matching_label_row['label_end_datetime'].iloc[0]}. Using its start time as anchor: {BOULDERING_START_TIME_FOR_RELATIVE_DATA}")
-
+            BOULDERING_START_TIME_FOR_RELATIVE_DATA = datetime.strptime(f"{date_str} {time_str}", '%Y-%m-%d %H:%M:%S')
+            print(f"Using folder timestamp as anchor: {BOULDERING_START_TIME_FOR_RELATIVE_DATA}")
         except (ValueError, IndexError) as e:
             print(
-                f"Warning: Could not parse timestamp from folder name '{dataset_folder_name_raw}' or find matching label. Error: {e}. Skipping folder.")
+                f"Warning: Could not parse timestamp from folder name '{dataset_folder_name_raw}'. Error: {e}. Skipping folder.")
             continue
 
         datasets_for_current_folder_granularities = []
-
         DataViz = VisualizeDataset(__file__)
 
         for ms_per_instance in GRANULARITIES:
@@ -93,6 +78,7 @@ for participant_folder_name in os.listdir(ROOT_DATA_PATH):
 
             dataset = CreateDataset(DATASET_PATH, ms_per_instance)
 
+            # Add all numerical datasets as before, using the folder timestamp as the anchor.
             dataset.add_numerical_dataset_with_unit('Accelerometer.csv', "Time (s)",
                                                     ["X (m/s^2)", "Y (m/s^2)", "Z (m/s^2)"], 'avg', 'acc_',
                                                     is_relative_time=True,
@@ -108,12 +94,20 @@ for participant_folder_name in os.listdir(ROOT_DATA_PATH):
                                                     'loc_', is_relative_time=True,
                                                     recording_start_time=BOULDERING_START_TIME_FOR_RELATIVE_DATA)
 
-            dataset.add_event_dataset_with_unit(matching_label_row, 'label_start', 'label_end', 'label', 'binary',
-                                                timestamp_unit='s', is_relative_time=False, recording_start_time=None)
-
             dataset = dataset.data_table
 
-            # FIX: Added prefixes to the column names to match the dataframe.
+            possible_labels = ['Easy', 'Medium', 'Hard']
+            for label in possible_labels:
+                dataset[f'label{label}'] = 0
+
+            if 'Easy' in dataset_name:
+                dataset['labelEasy'] = 1
+            elif 'Medium' in dataset_name:
+                dataset['labelMedium'] = 1
+            elif 'Hard' in dataset_name:
+                dataset['labelHard'] = 1
+
+            # The plotting and saving logic remains the same.
             DataViz.plot_dataset_boxplot(dataset, ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)'],
                                          participant_name=participant_name, dataset_name=dataset_name)
             DataViz.plot_dataset_boxplot(dataset, ["gyr_X (rad/s)", "gyr_Y (rad/s)", "gyr_Z (rad/s)"],
@@ -148,7 +142,6 @@ for participant_folder_name in os.listdir(ROOT_DATA_PATH):
     all_fine_grained_dataset_names_overall.extend(all_fine_grained_dataset_names_for_participant)
 
 if len(all_fine_grained_datasets_overall) > 0:
-    # The overall plots should remain the same.
     DataViz = VisualizeDataset(__file__)
     features_to_compare = ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)', 'gyr_X (rad/s)', 'gyr_Y (rad/s)',
                            'gyr_Z (rad/s)', 'mag_X (µT)', 'mag_Y (µT)', 'mag_Z (µT)', 'loc_Height (m)',
