@@ -2,10 +2,16 @@ import os
 import re
 import pandas as pd
 import xgboost as xgb
+import seaborn as sns
+import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 
 # Path to the folder containing CSV files
 folder_path = './intermediate_datafiles_bouldering/xgboost'
+figure_folder_path = './intermediate_datafiles_bouldering/figures_xgboost'  #TODO change to correct path
+
+if not os.path.exists(figure_folder_path):
+    os.makedirs(figure_folder_path)
 
 # Initialize lists to store dataframes by label
 easy_instances = []
@@ -84,6 +90,8 @@ y_test = test_data['target']
 model = xgb.XGBClassifier(enable_categorical=False)  # Set enable_categorical=True if using categorical columns
 model.fit(X_train, y_train)
 
+class_names = ["Easy", "Medium", "Hard"]
+
 # Make predictions and evaluate the model
 y_pred = model.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
@@ -100,3 +108,13 @@ print(f"Recall: {recall:.4f}")
 print(f"F1 Score: {f1:.4f}")
 print("Confusion Matrix:")
 print(conf_matrix)
+
+# Plot confusion matrix heatmap
+plt.figure(figsize=(8, 6))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
+plt.title("Confusion Matrix Heatmap")
+plt.xlabel("Predicted Labels")
+plt.ylabel("True Labels")
+
+# Save the figure to a file
+plt.savefig(f"{figure_folder_path}/confusion_matrix_heatmap.png", dpi=300, bbox_inches='tight')
