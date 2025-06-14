@@ -109,6 +109,8 @@ print(f"F1 Score: {f1:.4f}")
 print("Confusion Matrix:")
 print(conf_matrix)
 
+#TODO create separate file for metrics (or check ML4QS codebase)
+
 # Plot confusion matrix heatmap
 plt.figure(figsize=(8, 6))
 sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
@@ -118,3 +120,26 @@ plt.ylabel("True Labels")
 
 # Save the figure to a file
 plt.savefig(f"{figure_folder_path}/confusion_matrix_heatmap.png", dpi=300, bbox_inches='tight')
+print(f'saved confusion matrix heatmap to {figure_folder_path}/confusion_matrix_heatmap.png')
+
+# Get feature importance from the model
+feature_importance = model.feature_importances_ # obtain feature importance scores based on Gain
+features = X_train.columns 
+
+# Create a DataFrame for better visualization
+importance_df = pd.DataFrame({
+    'Feature': features,
+    'Importance': feature_importance
+}).sort_values(by='Importance', ascending=False)
+
+# Plot feature importance as a horizontal bar chart
+plt.figure(figsize=(10, 6))
+plt.barh(importance_df['Feature'], importance_df['Importance'], color='skyblue')
+plt.xlabel("Importance")
+plt.ylabel("Features")
+plt.title("Feature Importance")
+plt.gca().invert_yaxis()  # Invert y-axis to show the most important feature at the top
+
+# Save the figure to a file
+plt.savefig(f"{figure_folder_path}/feature_importance.png", dpi=300, bbox_inches='tight')
+print(f'saved feature importance plot to {figure_folder_path}/feature_importance.png')
