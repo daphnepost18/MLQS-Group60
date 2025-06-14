@@ -21,7 +21,7 @@ import glob
 ROOT_DATA_PATH = Path('./datasets/bouldering/')
 RESULT_PATH = Path('./intermediate_datafiles_bouldering/')
 
-GRANULARITIES = [250, 6000]
+GRANULARITIES = [250, 1000]
 
 [path.mkdir(exist_ok=True, parents=True) for path in [ROOT_DATA_PATH, RESULT_PATH]]
 
@@ -189,6 +189,10 @@ if csv_files_to_combine:
 
     # Save the combined DataFrame to a new CSV file.
     combined_df.to_csv(output_path)
+
+    # Print statistics for the final combined dataframe.
+    print('\n--- Statistics for the Combined Dataset ---')
+    util.print_statistics(combined_df)
 
     print(f'Successfully combined {len(csv_files_to_combine)} files into:')
     print(f'{output_path}')
