@@ -61,7 +61,7 @@ def main():
 
         # Construct the base name for the output file
         base_output_name = input_file_path.name.replace('chapter2_result_', 'chapter3_result_outliers_')
-        dataset_name = input_file_path.name.replace('chapter2_result_', '')
+        dataset_name = input_file_path.name.replace('chapter2_result_', '').replace('.csv', '')
 
         if FLAGS.mode == 'chauvenet':
             for col in outlier_columns:

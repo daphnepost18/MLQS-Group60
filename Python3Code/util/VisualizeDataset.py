@@ -158,7 +158,7 @@ class VisualizeDataset:
         plt.close('all')
 
     def plot_xy(self, x, y, method='plot', xlabel=None, ylabel=None, xlim=None, ylim=None, names=None,
-                line_styles=None, loc=None, title=None):
+                line_styles=None, loc=None, title=None, dataset_name=None, methodch3=None):
         for input in x, y:
             if not hasattr(input[0], '__iter__'):
                 raise TypeError('x/y should be given as a list of lists of coordinates')
@@ -175,7 +175,7 @@ class VisualizeDataset:
             if title is not None: plt.title(title)
             if names is not None: plt.legend(names)
 
-        self.save(plt)
+        self.save(plt, prefix=f"{dataset_name}_{methodch3}")
         plt.close('all')
 
     def plot_feature_distributions_across_datasets(self, datasets, feature_cols, dataset_labels, main_title=None):
@@ -385,7 +385,7 @@ class VisualizeDataset:
         self.save(plt,prefix=f"({dataset_name}_{method}")
         plt.close('all')
 
-    def plot_imputed_values(self, data_table, names, col, *values):
+    def plot_imputed_values(self, data_table, names, col, *values, dataset_name=None, method=None):
 
         xfmt = md.DateFormatter('%H:%M')
 
@@ -411,7 +411,7 @@ class VisualizeDataset:
 
         plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
         plt.xlabel('time')
-        self.save(plt)
+        self.save(plt, prefix=f"{dataset_name}_{method}")
         plt.close('all')
 
     def plot_clusters_3d(self, data_table, data_cols, cluster_col, label_cols):

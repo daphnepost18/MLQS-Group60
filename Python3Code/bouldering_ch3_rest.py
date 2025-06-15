@@ -78,6 +78,7 @@ def main():
 
         # Construct the base name for the output file
         base_output_name = input_file_path.name.replace('chapter3_result_outliers_', 'chapter3_result_final_')
+        dataset_name = input_file_path.name.replace('chapter3_result_outliers_', '').replace('.csv', '')
 
         if FLAGS.mode == 'imputation':
             # Let us impute the missing values and plot an example.
@@ -88,7 +89,8 @@ def main():
             DataViz.plot_imputed_values(dataset, ['original', 'mean', 'median', 'interpolation'], 'acc_X (m/s^2)',
                                         imputed_mean_dataset['acc_X (m/s^2)'],
                                         imputed_median_dataset['acc_X (m/s^2)'],
-                                        imputed_interpolation_dataset['acc_X (m/s^2)'])
+                                        imputed_interpolation_dataset['acc_X (m/s^2)'],
+                                        dataset_name=dataset_name, method='Imputation')
 
         elif FLAGS.mode == 'kalman':
             # Using the result from Chapter 2, let us try the Kalman filter on the attribute and study the result.
@@ -107,9 +109,10 @@ def main():
             kalman_dataset = KalFilter.apply_kalman_filter(
                 original_dataset, 'acc_X (m/s^2)')
             DataViz.plot_imputed_values(kalman_dataset, [
-                'original', 'kalman'], 'acc_X (m/s^2)', kalman_dataset['acc_X (m/s^2)_kalman'])
+                'original', 'kalman'], 'acc_X (m/s^2)', kalman_dataset['acc_X (m/s^2)_kalman'],
+                                        dataset_name=dataset_name, method='Kalman')
             DataViz.plot_dataset(kalman_dataset, ['acc_X (m/s^2)', 'acc_X (m/s^2)_kalman'], [
-                'exact', 'exact'], ['line', 'line'])
+                'exact', 'exact'], ['line', 'line'], dataset_name=dataset_name, method='Kalman')
 
         elif FLAGS.mode == 'lowpass':
             fs = float(1000) / milliseconds_per_instance
@@ -120,7 +123,8 @@ def main():
 
             DataViz.plot_dataset(
                 new_dataset.iloc[int(0.4 * len(new_dataset.index)):int(0.43 * len(new_dataset.index)), :],
-                ['acc_X (m/s^2)', 'acc_X (m/s^2)_lowpass'], ['exact', 'exact'], ['line', 'line'])
+                ['acc_X (m/s^2)', 'acc_X (m/s^2)_lowpass'], ['exact', 'exact'], ['line', 'line'],
+                        dataset_name=dataset_name, method='Lowpass')
 
         elif FLAGS.mode == 'PCA':
             for col in [c for c in dataset.columns if not 'label' in c]:
@@ -141,7 +145,7 @@ def main():
 
             DataViz.plot_xy(x=[range(1, len(selected_predictor_cols) + 1)], y=[pc_values],
                             xlabel='principal component number', ylabel='explained variance',
-                            ylim=[0, 1], line_styles=['b-'])
+                            ylim=[0, 1], line_styles=['b-'], dataset_name=dataset_name, methodch3='PCA')
 
             n_pcs = 7
             if n_pcs > len(selected_predictor_cols):
@@ -155,7 +159,7 @@ def main():
                 dataset), selected_predictor_cols, n_pcs)
 
             DataViz.plot_dataset(dataset, ['pca_', 'label'], [
-                'like', 'like'], ['line', 'points'])
+                'like', 'like'], ['line', 'points'], dataset_name=dataset_name, method='PCA')
 
         elif FLAGS.mode == 'final':
             for col in [c for c in dataset.columns if not 'label' in c]:
@@ -219,7 +223,8 @@ def main():
             DataViz.plot_dataset(dataset,
                                  ['acc_', 'gyr_', 'mag_', 'loc_', 'pca_','label'],
                                  ['like', 'like', 'like', 'like', 'like', 'like'],
-                                 ['line', 'line', 'line', 'line', 'points', 'points'])
+                                 ['line', 'line', 'line', 'line', 'points', 'points'],
+                                 dataset_name=dataset_name, method='final')
 
             output_file = DATA_PATH / f'{base_output_name}'
             dataset.to_csv(output_file)
