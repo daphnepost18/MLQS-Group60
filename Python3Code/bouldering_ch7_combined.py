@@ -95,7 +95,7 @@ features, ordered_features, ordered_scores = fs.forward_selection(N_FORWARD_SELE
                                                                   gridsearch=False)
 
 DataViz.plot_xy(x=[range(1, N_FORWARD_SELECTION + 1)], y=[ordered_scores],
-                xlabel='number of features', ylabel='accuracy')
+                xlabel='number of features', ylabel='accuracy', dataset_name='combined', methodch3='f_selection')
 
 selected_features = ordered_features[:10]
 print(f"\nTop 10 selected features: {selected_features}")
@@ -127,7 +127,7 @@ for reg_param in reg_parameters:
 
 DataViz.plot_xy(x=[reg_parameters, reg_parameters], y=[performance_training, performance_test], method='semilogx',
                 xlabel='regularization parameter value', ylabel='accuracy',
-                names=['training', 'test'], line_styles=['r-', 'b:'])
+                names=['training', 'test'], line_styles=['r-', 'b:'], dataset_name='combined', methodch3='regularization')
 
 print("\nStudying Decision Tree complexity...")
 leaf_settings = [1, 2, 5, 10]
@@ -144,7 +144,7 @@ for no_points_leaf in leaf_settings:
 
 DataViz.plot_xy(x=[leaf_settings, leaf_settings], y=[performance_training, performance_test],
                 xlabel='minimum number of points per leaf', ylabel='accuracy',
-                names=['training', 'test'], line_styles=['r-', 'b:'])
+                names=['training', 'test'], line_styles=['r-', 'b:'], dataset_name='combined', methodch3='leaf_settings')
 
 # Perform grid searches over the most important parameters by means of cross validation.
 
