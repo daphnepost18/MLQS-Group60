@@ -26,12 +26,10 @@ from Chapter7.FeatureSelection import FeatureSelectionClassification
 from util import util
 from util.VisualizeDataset import VisualizeDataset
 
-# --- MODIFIED: Updated file paths for the bouldering dataset ---
 DATA_PATH = Path('./intermediate_datafiles_bouldering/')
-DATASET_FNAME = 'chapter5_result_participant1_combined.csv'  # Using your combined file
+DATASET_FNAME = 'chapter5_result_participant1_combined.csv'
 RESULT_FNAME = 'chapter7_classification_result_combined.csv'
 EXPORT_TREE_PATH = Path('./figures/bouldering_ch7_combined/')
-# ----------------------------------------------------------------
 
 # Next, we declare the parameters we'll use in the algorithms.
 N_FORWARD_SELECTION = 50
@@ -51,7 +49,6 @@ DataViz = VisualizeDataset(__file__)
 # We create a single column with the categorical attribute representing our class.
 prepare = PrepareDatasetForLearning()
 
-# --- MODIFIED: We call the function with 'like' to trigger its internal label processing. ---
 # The function will find 'labelEasy', 'labelMedium', etc., and create a 'class' column.
 train_X, test_X, train_y, test_y = prepare.split_single_dataset_classification(dataset, ['label'], 'like', 0.7,
                                                                                filter=True, temporal=False)
@@ -59,7 +56,6 @@ train_X, test_X, train_y, test_y = prepare.split_single_dataset_classification(d
 print('Training set length is: ', len(train_X.index))
 print('Test set length is: ', len(test_X.index))
 
-# --- MODIFIED: Select subsets of features based on your dataset's columns ---
 basic_features = ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)',
                   'gyr_X (rad/s)', 'gyr_Y (rad/s)', 'gyr_Z (rad/s)',
                   'mag_X (µT)', 'mag_Y (µT)', 'mag_Z (µT)',
@@ -101,10 +97,8 @@ features, ordered_features, ordered_scores = fs.forward_selection(N_FORWARD_SELE
 DataViz.plot_xy(x=[range(1, N_FORWARD_SELECTION + 1)], y=[ordered_scores],
                 xlabel='number of features', ylabel='accuracy')
 
-# --- MODIFIED: Dynamically select the 10 best features from the forward selection step ---
 selected_features = ordered_features[:10]
 print(f"\nTop 10 selected features: {selected_features}")
-# ------------------------------------------------------------------------------------------
 
 # # Let us first study the impact of regularization and model complexity.
 
@@ -115,7 +109,6 @@ print("\nStudying NN regularization...")
 reg_parameters = [0.0001, 0.001, 0.01, 0.1, 1, 10]
 performance_training = []
 performance_test = []
-## Due to runtime constraints we run the experiment 3 times.
 N_REPEATS_NN = 3
 
 for reg_param in reg_parameters:
