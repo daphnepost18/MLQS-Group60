@@ -53,7 +53,7 @@ def main():
                 f"Combined file not found at '{combined_file}'. Please run bouldering_ch5.py with '--mode final' and '--source combined'.")
         return
 
-    N_FORWARD_SELECTION = 50
+    N_FORWARD_SELECTION = 30
 
     for input_file_path in input_files:
         print(f"\n\n======================================================")
