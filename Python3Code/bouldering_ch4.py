@@ -131,7 +131,6 @@ def main():
             CatAbs = CategoricalAbstraction()
             label_cols = [col for col in dataset.columns if col.startswith('label')]
             if label_cols:
-                # FIX: Added the missing 'max_pattern_size' argument with a value of 2.
                 dataset = CatAbs.abstract_categorical(dataset, label_cols, ['exact'] * len(label_cols), 0.03, ws, 2)
 
             periodic_predictor_cols = ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)',

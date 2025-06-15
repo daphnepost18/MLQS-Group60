@@ -30,10 +30,8 @@ def main():
     start_time = time.time()
     DATA_PATH = Path('./intermediate_datafiles_bouldering/')
 
-    # NEW: Create a boolean variable based on the --source argument.
     USE_ALL_FILES = (FLAGS.source == 'all')
 
-    # NEW: Conditional logic to select which files to process.
     if USE_ALL_FILES:
         print("Mode: Processing all individual chapter 5 final result files...")
         all_chapter5_files = list(DATA_PATH.glob('chapter5_result_*.csv'))
@@ -46,7 +44,6 @@ def main():
         else:
             input_files = []
 
-    # Check if any files were found to process.
     if not input_files:
         if USE_ALL_FILES:
             print(
@@ -58,7 +55,6 @@ def main():
 
     N_FORWARD_SELECTION = 50
 
-    # NEW: Main loop to process each selected file.
     for input_file_path in input_files:
         print(f"\n\n======================================================")
         print(f"--- Processing file: {input_file_path.name} ---")
@@ -71,7 +67,6 @@ def main():
             print(f'File not found: {input_file_path.name}. Skipping.')
             continue
 
-        # NEW: Make names and paths dynamic based on the input file.
         dataset_name = input_file_path.stem.replace('chapter5_result_', '')
         EXPORT_TREE_PATH = Path(f'./figures/bouldering_ch7_{dataset_name}/')
         EXPORT_TREE_PATH.mkdir(exist_ok=True, parents=True)
@@ -79,13 +74,12 @@ def main():
         DataViz = VisualizeDataset(__file__)
         prepare = PrepareDatasetForLearning()
 
-        train_X, test_X, train_y, test_y = prepare.split_single_dataset_classification(dataset, ['label'], 'like', 0.8,
+        train_X, test_X, train_y, test_y = prepare.split_single_dataset_classification(dataset, ['label'], 'like', 0.7,
                                                                                        filter=True, temporal=False)
 
         print('Training set length is: ', len(train_X.index))
         print('Test set length is: ', len(test_X.index))
 
-        # Define feature sets
         basic_features = [c for c in train_X.columns if
                           c.startswith('acc_') or c.startswith('gyr_') or c.startswith('mag_') or c.startswith('loc_')]
         pca_features = [c for c in train_X.columns if c.startswith('pca_')]
@@ -133,8 +127,7 @@ def main():
             current_features = possible_feature_sets[i]
             if not current_features or not all(f in train_X.columns for f in current_features):
                 print(f"Skipping feature set '{feature_names[i]}' as it contains missing or no features.")
-                # Add a placeholder for plotting
-                scores_over_all_algs.append([(0, 0)] * 6)  # 6 is the number of algorithms
+                scores_over_all_algs.append([(0, 0)] * 5)  # 5 algorithms
                 continue
 
             selected_train_X = train_X[current_features]
@@ -142,7 +135,6 @@ def main():
 
             performance_tr_nn, performance_te_nn = (0, 0)
             performance_tr_rf, performance_te_rf = (0, 0)
-            performance_tr_svm, performance_te_svm = (0, 0)
 
             for repeat in range(N_KCV_REPEATS):
                 print(f"\nRun {repeat + 1}/{N_KCV_REPEATS} for feature set: '{feature_names[i]}'")
@@ -159,48 +151,59 @@ def main():
                 performance_tr_rf += eval.accuracy(train_y, c_train_y)
                 performance_te_rf += eval.accuracy(test_y, c_test_y)
 
-            # Deterministic classifiers
+            # Average the results
+            performance_tr_nn /= N_KCV_REPEATS
+            performance_te_nn /= N_KCV_REPEATS
+            performance_tr_rf /= N_KCV_REPEATS
+            performance_te_rf /= N_KCV_REPEATS
+
             print("\nTraining Deterministic Classifiers...")
             print(f"Featureset: {feature_names[i]}")
 
             print("Training K-Nearest Neighbor...")
-            c_train_y, c_test_y, _, _ = learner.k_nearest_neighbor(selected_train_X, train_y, selected_test_X,
-                                                                   gridsearch=True)
-            performance_te_knn = eval.accuracy(test_y, c_test_y)
+            c_train_y_knn, c_test_y_knn, _, _ = learner.k_nearest_neighbor(selected_train_X, train_y, selected_test_X,
+                                                                           gridsearch=True)
+            performance_tr_knn = eval.accuracy(train_y, c_train_y_knn)
+            performance_te_knn = eval.accuracy(test_y, c_test_y_knn)
 
             print("Training Decision Tree...")
-            c_train_y, c_test_y, _, class_train_prob_y_dt = learner.decision_tree(selected_train_X, train_y,
-                                                                                  selected_test_X, gridsearch=True)
-            performance_te_dt = eval.accuracy(test_y, c_test_y)
+            c_train_y_dt, c_test_y_dt, class_train_prob_y_dt, _ = learner.decision_tree(selected_train_X, train_y,
+                                                                                        selected_test_X,
+                                                                                        gridsearch=True)
+            performance_tr_dt = eval.accuracy(train_y, c_train_y_dt)
+            performance_te_dt = eval.accuracy(test_y, c_test_y_dt)
 
             print("Training Naive Bayes...")
-            c_train_y, c_test_y, _, _ = learner.naive_bayes(selected_train_X, train_y, selected_test_X)
-            performance_te_nb = eval.accuracy(test_y, c_test_y)
+            c_train_y_nb, c_test_y_nb, _, _ = learner.naive_bayes(selected_train_X, train_y, selected_test_X)
+            performance_tr_nb = eval.accuracy(train_y, c_train_y_nb)
+            performance_te_nb = eval.accuracy(test_y, c_test_y_nb)
 
-            scores_with_sd = util.print_table_row_performances_classification(
-                feature_names[i],
+            # FIX: Reverted to the correct function call with the correct arguments.
+            scores_with_sd = util.print_table_row_performances(
+                feature_names[i], len(selected_train_X.index), len(selected_test_X.index),
                 [
-                    (performance_te_nn / N_KCV_REPEATS), (performance_te_rf / N_KCV_REPEATS),
-                    0,  # SVM removed for simplicity
-                    performance_te_knn, performance_te_dt, performance_te_nb
+                    (performance_tr_nn, performance_te_nn),
+                    (performance_tr_rf, performance_te_rf),
+                    (performance_tr_knn, performance_te_knn),
+                    (performance_tr_dt, performance_te_dt),
+                    (performance_tr_nb, performance_te_nb)
                 ]
             )
             scores_over_all_algs.append(scores_with_sd)
 
-        DataViz.plot_performances_classification(['NN', 'RF', 'SVM', 'KNN', 'DT', 'NB'], feature_names,
-                                                 scores_over_all_algs, dataset_name)
+        # FIX: Removed 'SVM' from the list of algorithms for plotting.
+        DataViz.plot_performances_classification(['NN', 'RF', 'KNN', 'DT', 'NB'], feature_names, scores_over_all_algs)
 
         print("\nDetailed analysis of Decision Tree with selected features...")
-        if not selected_features:
-            print("No features were selected, skipping detailed analysis.")
+        if not selected_features or not all(f in train_X.columns for f in selected_features):
+            print("No valid features were selected, skipping detailed analysis.")
         else:
             _, class_test_y_dt, _, class_train_prob_y_dt = learner.decision_tree(
                 train_X[selected_features], train_y, test_X[selected_features],
                 gridsearch=True, print_model_details=True, export_tree_path=EXPORT_TREE_PATH
             )
             test_cm = eval.confusion_matrix(test_y, class_test_y_dt, class_train_prob_y_dt.columns)
-            DataViz.plot_confusion_matrix(test_cm, class_train_prob_y_dt.columns, normalize=False,
-                                          dataset_name=dataset_name)
+            DataViz.plot_confusion_matrix(test_cm, class_train_prob_y_dt.columns, normalize=False)
 
     print(f"\nTotal processing time: {time.time() - start_time} seconds")
 
@@ -208,7 +211,6 @@ def main():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    # NEW: Argument to control which files are processed, with 'combined' as the default.
     parser.add_argument('--source', type=str, default='combined',
                         help="Specify source: 'all' for individual files, or 'combined' for the single combined file.",
                         choices=['all', 'combined'])
