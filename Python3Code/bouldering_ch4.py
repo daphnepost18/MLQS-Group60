@@ -68,6 +68,7 @@ def main():
             continue
 
         base_output_name = input_file_path.name.replace('chapter3_result_final_', 'chapter4_result_')
+        dataset_name = input_file_path.name.replace('chapter3_result_final_', 'chapter4_result_').replace('.csv', '')
 
         if FLAGS.mode == 'aggregation':
             window_sizes = [int(5000 / milliseconds_per_instance),
@@ -78,7 +79,8 @@ def main():
                 dataset = NumAbs.abstract_numerical(dataset, [ACC_X], ws, 'mean')
                 dataset = NumAbs.abstract_numerical(dataset, [ACC_X], ws, 'std')
             DataViz.plot_dataset(dataset, [ACC_X, f'{ACC_X}_temp_mean', f'{ACC_X}_temp_std', 'label'],
-                                 ['exact', 'like', 'like', 'like'], ['line', 'line', 'line', 'points'])
+                                 ['exact', 'like', 'like', 'like'], ['line', 'line', 'line', 'points'],
+                                 dataset_name=dataset_name, method='Aggregation')
             output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_aggregation.csv'
             dataset.to_csv(output_file)
             print(f"Results for {input_file_path.name} saved to: {output_file}")
@@ -89,7 +91,8 @@ def main():
             ACC_X = 'acc_X (m/s^2)'
             dataset = FreqAbs.abstract_frequency(dataset, [ACC_X], ws, fs)
             DataViz.plot_dataset(dataset, [f'{ACC_X}_max_freq', f'{ACC_X}_freq_weighted', f'{ACC_X}_pse', 'label'],
-                                 ['like', 'like', 'like', 'like'], ['line', 'line', 'line', 'points'])
+                                 ['like', 'like', 'like', 'like'], ['line', 'line', 'line', 'points'],
+                                 dataset_name=dataset_name, method='Frequency')
             output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_frequency.csv'
             dataset.to_csv(output_file)
             print(f"Results for {input_file_path.name} saved to: {output_file}")
@@ -110,7 +113,8 @@ def main():
             PCA_1 = 'pca_1'
             DataViz.plot_dataset(dataset, [ACC_X, GYR_X, MAG_X, LOC_HEIGHT, PCA_1, 'label'],
                                  ['like', 'like', 'like', 'like', 'like', 'like'],
-                                 ['line', 'line', 'line', 'line', 'line', 'points'])
+                                 ['line', 'line', 'line', 'line', 'line', 'points'],
+                                 dataset_name=dataset_name, method='Final')
 
             # FIX: Instantiate CategoricalAbstraction INSIDE the loop.
             # This creates a fresh, stateless object for each file.

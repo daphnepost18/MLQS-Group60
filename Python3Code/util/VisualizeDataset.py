@@ -68,7 +68,7 @@ class VisualizeDataset:
         self.save(plt, prefix=file_prefix)
         plt.close('all')
 
-    def plot_dataset(self, data_table, columns, match='like', display='line', participant_name=None, dataset_name=None):
+    def plot_dataset(self, data_table, columns, match='like', display='line', participant_name=None, dataset_name=None, method=None):
         data_table.index = pd.to_datetime(data_table.index)
         names = list(data_table.columns)
 
@@ -143,7 +143,11 @@ class VisualizeDataset:
             plt.suptitle(title_str, fontsize=16)
 
         file_prefix = None
-        if participant_name and dataset_name:
+        if participant_name and dataset_name and method:
+            file_prefix = f"plot_{participant_name.replace(' ', '_')}_{dataset_name.replace(' ', '_')}_{method}"
+        elif dataset_name and method:
+            file_prefix = f"plot_{dataset_name.replace(' ', '_')}_{method}"
+        elif participant_name and dataset_name:
             file_prefix = f"plot_{participant_name.replace(' ', '_')}_{dataset_name.replace(' ', '_')}"
         elif participant_name:
             file_prefix = f"plot_{participant_name.replace(' ', '_')}"
