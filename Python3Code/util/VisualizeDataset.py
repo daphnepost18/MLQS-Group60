@@ -414,7 +414,7 @@ class VisualizeDataset:
         self.save(plt, prefix=f"{dataset_name}_{method}")
         plt.close('all')
 
-    def plot_clusters_3d(self, data_table, data_cols, cluster_col, label_cols):
+    def plot_clusters_3d(self, data_table, data_cols, cluster_col, label_cols, dataset_name=None, method=None):
 
         color_index = 0
         point_displays = ['+', 'x', '*', 'd', 'o', 's', '<', '>']
@@ -448,10 +448,10 @@ class VisualizeDataset:
             color_index += 1
 
         plt.legend(handles, labels, fontsize='xx-small', numpoints=1)
-        self.save(plt)
+        self.save(plt, prefix=f"{dataset_name}_{method}")
         plt.close('all')
 
-    def plot_silhouette(self, data_table, cluster_col, silhouette_col):
+    def plot_silhouette(self, data_table, cluster_col, silhouette_col, dataset_name=None, method=None):
 
         clusters = data_table[cluster_col].unique()
 
@@ -483,10 +483,10 @@ class VisualizeDataset:
 
         ax1.set_yticks([])
         ax1.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
-        self.save(plt)
+        self.save(plt, prefix=f"{dataset_name}_{method}")
         plt.close('all')
 
-    def plot_dendrogram(self, dataset, linkage):
+    def plot_dendrogram(self, dataset, linkage, dataset_name=None, method=None):
         sys.setrecursionlimit(40000)
         plt.title('Hierarchical Clustering Dendrogram')
         plt.xlabel('time points')
@@ -494,7 +494,7 @@ class VisualizeDataset:
         times = dataset.index.strftime('%H:%M:%S')
         dendrogram(linkage, truncate_mode='lastp', p=16, show_leaf_counts=True, leaf_rotation=45., leaf_font_size=8.,
                    show_contracted=True, labels=times)
-        self.save(plt)
+        self.save(plt, prefix=f"{dataset_name}_{method}")
         plt.close('all')
 
     def plot_confusion_matrix(self, cm, classes, normalize=False):
@@ -603,7 +603,7 @@ class VisualizeDataset:
         plt.close('all')
 
     def plot_performances_classification(self, algs, feature_subset_names, scores_over_all_algs):
-        self.plot_performances(algs, feature_subset_names, scores_over_all_algs, [0.70, 1.0], 2, 'Accuracy')
+        self.plot_performances(algs, feature_subset_names, scores_over_all_algs, None, 2, 'Accuracy')
 
     def plot_performances_regression(self, algs, feature_subset_names, scores_over_all_algs):
         self.plot_performances(algs, feature_subset_names, scores_over_all_algs, None, 1, 'Mean Squared Error')

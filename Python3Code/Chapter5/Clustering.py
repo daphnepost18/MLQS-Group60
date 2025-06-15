@@ -299,36 +299,77 @@ class NonHierarchicalClustering:
 # In this class, we do not implement the Gover distance between instance, all others are included.
 # Furthermore, we only implement the agglomerative approach.
 class HierarchicalClustering:
-
     link = None
 
-    # Perform agglomerative clustering over a single dataset.
-    def agglomerative_over_instances(self, dataset, cols, max_clusters, distance_metric, use_prev_linkage=False, link_function='single'):
-        temp_dataset = dataset[cols]
-        df = NonHierarchicalClustering()
+    def agglomerative_over_instances(self, dataset, cols, max_clusters, distance_metric, use_prev_linkage=False,
+                                     link_function='single'):
+        # --- MODIFICATION START ---
+        # 1. Create a clean subset of the data for clustering
+        #    This is crucial to ensure 'linkage' or 'AgglomerativeClustering' doesn't receive NaNs.
+        #    We then capture the index of these *cleaned* rows.
+        temp_dataset_for_clustering = dataset[cols].dropna()
+        original_indices_of_clustered_data = temp_dataset_for_clustering.index
+
+        # Handle cases where there's no data or not enough data after dropping NaNs
+        if temp_dataset_for_clustering.empty:
+            print(
+                f"Warning: No valid data points for agglomerative clustering after dropping NaNs in columns: {cols}. Returning original dataset with NaNs for cluster/silhouette.")
+            dataset['cluster'] = np.nan
+            dataset['silhouette'] = np.nan
+            return dataset, None
+
+        # Also check if enough samples for silhouette/clustering (n_clusters > 1 and < num_samples)
+        if max_clusters <= 1 or max_clusters >= len(temp_dataset_for_clustering):
+            print(
+                f"Warning: max_clusters={max_clusters} is invalid for agglomerative clustering with {len(temp_dataset_for_clustering)} samples. k must be > 1 and < number of samples. Returning original dataset with NaNs for cluster/silhouette.")
+            dataset['cluster'] = np.nan
+            dataset['silhouette'] = np.nan
+            return dataset, None
+
+        # --- MODIFICATION END ---
+
+        df_nh = NonHierarchicalClustering()  # Reference to your NonHierarchicalClustering class
 
         if (not use_prev_linkage) or (self.link is None):
             # Perform the clustering process according to the specified distance metric.
-            if distance_metric == df.manhattan:
-                self.link = linkage(temp_dataset.values, method=link_function, metric='cityblock')
+            if distance_metric == df_nh.manhattan:
+                # Use temp_dataset_for_clustering.values here
+                self.link = linkage(temp_dataset_for_clustering.values, method=link_function, metric='cityblock')
             else:
-                self.link = linkage(temp_dataset.values, method=link_function, metric='euclidean')
+                # Use temp_dataset_for_clustering.values here
+                self.link = linkage(temp_dataset_for_clustering.values, method=link_function, metric='euclidean')
 
-        # And assign the clusters given the set maximum. In addition, compute the
-        cluster_assignment = fcluster(self.link, max_clusters, criterion='maxclust')
-        dataset['cluster'] = cluster_assignment
-        silhouette_avg = silhouette_score(temp_dataset, np.array(cluster_assignment))
-        silhouette_per_inst = silhouette_samples(temp_dataset, np.array(cluster_assignment))
-        dataset['silhouette'] = silhouette_per_inst
+        # And assign the clusters given the set maximum.
+        cluster_assignment_raw = fcluster(self.link, max_clusters, criterion='maxclust')
+
+        # --- MODIFICATION START ---
+        # Map cluster_assignment back to the original dataset's index
+        # Create a Series using the cluster assignments and the *original indices of the clustered data*
+        cluster_assignment_series = pd.Series(cluster_assignment_raw, index=original_indices_of_clustered_data)
+        # Reindex this Series to the full original dataset's index. This will fill NaN for rows
+        # that were not included in clustering (e.g., due to NaNs or prior filtering).
+        dataset['cluster'] = cluster_assignment_series.reindex(dataset.index)
+
+        # Compute the silhouette score and map it back
+        # Use temp_dataset_for_clustering and cluster_assignment_raw for silhouette calculation
+        silhouette_per_inst_raw = silhouette_samples(temp_dataset_for_clustering, np.array(cluster_assignment_raw))
+        silhouette_per_inst_series = pd.Series(silhouette_per_inst_raw, index=original_indices_of_clustered_data)
+        dataset['silhouette'] = silhouette_per_inst_series.reindex(dataset.index)
+        # --- MODIFICATION END ---
+
+        # The original code also calculated silhouette_avg, which is not assigned to dataset.
+        silhouette_avg = silhouette_score(temp_dataset_for_clustering,
+                                          np.array(cluster_assignment_raw))  # Use cleaned data for calculation
 
         return dataset, self.link
 
     # Perform agglomerative clustering over the datasets by flattening them into a single dataset.
-    def agglomerative_over_datasets(self, datasets, cols, max_clusters, abstraction_method, distance_metric, use_prev_linkage=False, link_function='single'):
+    def agglomerative_over_datasets(self, datasets, cols, max_clusters, abstraction_method, distance_metric,
+                                    use_prev_linkage=False, link_function='single'):
         # Convert the datasets to instances
-        df = NonHierarchicalClustering()
-        temp_dataset = df.aggregate_datasets(datasets, cols, abstraction_method)
+        df_nh = NonHierarchicalClustering()
+        temp_dataset = df_nh.aggregate_datasets(datasets, cols, abstraction_method)
 
         # And simply apply the instance based algorithm...
-        return self.agglomerative_over_instances(temp_dataset, temp_dataset.columns, max_clusters, distance_metric, use_prev_linkage=use_prev_linkage, link_function=link_function)
-
+        return self.agglomerative_over_instances(temp_dataset, temp_dataset.columns, max_clusters, distance_metric,
+                                                 use_prev_linkage=use_prev_linkage, link_function=link_function)
