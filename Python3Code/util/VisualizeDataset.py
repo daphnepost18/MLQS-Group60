@@ -479,26 +479,46 @@ class VisualizeDataset:
         self.save(plt, prefix=f"{dataset_name}_{method}")
         plt.close('all')
 
-    def plot_confusion_matrix(self, cm, classes, normalize=False):
+    def plot_confusion_matrix(self, cm, classes, normalize=False, dataset_name=None, method=None):
+
+        # Create a descriptive title and file prefix
+        title_str = 'Confusion Matrix'
+        if method:
+            title_str = f'Confusion Matrix: {method}'
+
+        file_prefix = 'confusion_matrix'
+        if dataset_name:
+            file_prefix = f"{file_prefix}_{dataset_name.replace(' ', '_')}"
+        if method:
+            file_prefix = f"{file_prefix}_{method.replace(' ', '_')}"
+
         cmap = plt.cm.Blues
+        plt.figure()
         plt.imshow(cm, interpolation='nearest', cmap=cmap)
-        plt.title('confusion matrix')
+        plt.title(title_str)
         plt.colorbar()
         tick_marks = np.arange(len(classes))
-        plt.xticks(tick_marks, classes, rotation=45)
+        plt.xticks(tick_marks, classes, rotation=45, ha="right")
         plt.yticks(tick_marks, classes)
 
         if normalize:
             cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+            print("Normalized confusion matrix")
+        else:
+            print('Confusion matrix, without normalization')
 
         thresh = cm.max() / 2.
         for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
-            plt.text(j, i, cm[i, j], horizontalalignment="center", color="white" if cm[i, j] > thresh else "black")
+            value = f"{cm[i, j]:.2f}" if normalize else f"{int(cm[i, j])}"
+            plt.text(j, i, value,
+                     horizontalalignment="center",
+                     color="white" if cm[i, j] > thresh else "black")
 
         plt.tight_layout()
         plt.ylabel('True label')
         plt.xlabel('Predicted label')
-        self.save(plt)
+
+        self.save(plt, prefix=file_prefix)
         plt.close('all')
 
     def plot_numerical_prediction_versus_real(self, train_time, train_y, regr_train_y, test_time, test_y, regr_test_y,
@@ -566,21 +586,31 @@ class VisualizeDataset:
                                                    label)
 
     def plot_performances(self, algs, feature_subset_names, scores_over_all_algs, ylim, std_mult, y_name):
-
         width = float(1) / (len(feature_subset_names) + 1)
         ind = np.arange(len(algs))
+
+        plt.figure(figsize=(12, 8))
+
         for i in range(0, len(feature_subset_names)):
             means = []
             std = []
             for j in range(0, len(algs)):
                 means.append(scores_over_all_algs[i][j][2])
                 std.append(std_mult * scores_over_all_algs[i][j][3])
-            plt.errorbar(ind + i * width, means, yerr=std, fmt=self.colors[i % len(self.colors)] + 'o', markersize='3')
+            plt.errorbar(ind + i * width, means, yerr=std, fmt=self.colors[i % len(self.colors)] + 'o', markersize='3',
+                         label=feature_subset_names[i])
+
         plt.ylabel(y_name)
-        plt.xticks(ind + (float(len(feature_subset_names)) / 2) * width, algs)
-        plt.legend(feature_subset_names, loc=4, numpoints=1)
+        plt.xticks(ind + (float(len(feature_subset_names) - 1) / 2) * width, algs)
+
+        plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1),
+                   fancybox=True, shadow=True, ncol=len(feature_subset_names), numpoints=1)
+
         if not ylim is None:
             plt.ylim(ylim)
+
+        plt.subplots_adjust(bottom=0.2)
+
         self.save(plt)
         plt.close('all')
 
