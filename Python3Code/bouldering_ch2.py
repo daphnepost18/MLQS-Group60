@@ -158,53 +158,71 @@ if len(all_fine_grained_datasets_overall) > 0:
 print('\nThe code has run through successfully!')
 
 # ---------------------------------------------------------------------------
-# NEW CODE:
-# Combine all CSV files into a single file, adjusting timestamps to make them sequential.
+# Combine all generated CSV files into a single master file,
+# adjusting timestamps to make them sequential.
 # ---------------------------------------------------------------------------
 print('\nCombining all individual result CSVs into a single sequential file...')
 search_pattern = RESULT_PATH / 'chapter2_result_*.csv'
 all_csv_files = glob.glob(str(search_pattern))
 
-final_filename_str = 'chapter2_result_participant1_combined_seq.csv'
+final_filename_str = 'chapter2_result_combined_sequential.csv'
 csv_files_to_combine = [f for f in all_csv_files if 'combined' not in f]
 csv_files_to_combine.sort()
 
-if csv_files_to_combine:
-    adjusted_dfs = []
-    last_timestamp = None
-    sampling_interval = None
+adjusted_dfs = []
+last_timestamp = None
+sampling_interval = None
 
-    for file in csv_files_to_combine:
-        print(f"Processing and adjusting timestamps for {file}...")
-        df = pd.read_csv(file, index_col=0)
-        df.index = pd.to_datetime(df.index)
+for file in csv_files_to_combine:
+    print(f"Processing and adjusting timestamps for {file}...")
+    df = pd.read_csv(file, index_col=0)
+    df.index = pd.to_datetime(df.index)
 
-        if sampling_interval is None and len(df.index) > 1:
-            sampling_interval = df.index[1] - df.index[0]
+    if sampling_interval is None and len(df.index) > 1:
+        sampling_interval = df.index[1] - df.index[0]
 
-        if last_timestamp is None:
-            print("  This is the first file. Setting as baseline.")
-        else:
-            current_start_time = df.index.min()
-            new_start_time = last_timestamp + sampling_interval
-            time_shift = new_start_time - current_start_time
+    if last_timestamp is not None:
+        current_start_time = df.index.min()
+        new_start_time = last_timestamp + sampling_interval
+        time_shift = new_start_time - current_start_time
+        df.index = df.index + time_shift
 
-            print(f"  Shifting timestamps by: {time_shift}")
-            df.index = df.index + time_shift
+    last_timestamp = df.index.max()
+    adjusted_dfs.append(df)
 
-        last_timestamp = df.index.max()
-        adjusted_dfs.append(df)
+combined_df = pd.concat(adjusted_dfs)
+combined_df.sort_index(inplace=True)
+output_path = RESULT_PATH / final_filename_str
+combined_df.to_csv(output_path)
 
-    combined_df = pd.concat(adjusted_dfs)
-    combined_df.sort_index(inplace=True)
+print('\n--- Statistics for the Combined Sequential Dataset ---')
+util.print_statistics(combined_df)
 
-    output_path = RESULT_PATH / final_filename_str
-    combined_df.to_csv(output_path)
+# ---------------------------------------------------------------------------
+# Visualize the newly created combined dataset.
+# ---------------------------------------------------------------------------
+DataViz_combined = VisualizeDataset(__file__)
 
-    print(f'\nSuccessfully combined and adjusted {len(csv_files_to_combine)} files into: {output_path}')
+participant_name_combined = 'All Participants'
+dataset_name_combined = 'Combined Sequential'
 
-    print('\n--- Statistics for the Combined Sequential Dataset ---')
-    util.print_statistics(combined_df)
+DataViz_combined.plot_dataset_boxplot(combined_df, ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)'],
+                                      participant_name=participant_name_combined,
+                                      dataset_name=dataset_name_combined)
+DataViz_combined.plot_dataset_boxplot(combined_df, ["gyr_X (rad/s)", "gyr_Y (rad/s)", "gyr_Z (rad/s)"],
+                                      participant_name=participant_name_combined,
+                                      dataset_name=dataset_name_combined)
+DataViz_combined.plot_dataset_boxplot(combined_df, ["mag_X (µT)", "mag_Y (µT)", "mag_Z (µT)"],
+                                      participant_name=participant_name_combined,
+                                      dataset_name=dataset_name_combined)
+DataViz_combined.plot_dataset_boxplot(combined_df, ["loc_Height (m)", "loc_Velocity (m/s)"],
+                                      participant_name=participant_name_combined,
+                                      dataset_name=dataset_name_combined)
 
-else:
-    print('No individual result files were found to combine.')
+DataViz_combined.plot_dataset(combined_df, ['acc_', 'gyr_', 'mag_', 'loc_', 'label'],
+                              ['like', 'like', 'like', 'like', 'like'], ['line', 'line', 'line', 'line', 'points'],
+                              participant_name=participant_name_combined, dataset_name=dataset_name_combined)
+
+numerical_cols_combined = [col for col in combined_df.columns if 'label' not in col]
+DataViz_combined.plot_correlation_heatmap(combined_df, columns=numerical_cols_combined,
+                                          title=f"Correlation Heatmap for {dataset_name_combined} Dataset")
