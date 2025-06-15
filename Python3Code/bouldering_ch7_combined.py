@@ -45,50 +45,14 @@ except IOError as e:
 
 dataset.index = pd.to_datetime(dataset.index)
 
-one_hot_labels = ['labelEasy', 'labelMedium', 'labelHard']
-
-# Robustly clean the label columns
-for col in one_hot_labels:
-    if col in dataset.columns:
-        # Convert column to numeric, coercing errors to NaN, then fill NaN with 0
-        dataset[col] = pd.to_numeric(dataset[col], errors='coerce').fillna(0)
-    else:
-        print(f"Warning: Label column '{col}' not found in dataset. It will be ignored.")
-        # If a label column is missing, create it and fill with 0
-        dataset[col] = 0
-
-# Create the single 'label' column from the cleaned one-hot columns
-label_conditions = [
-    dataset['labelEasy'] == 1,
-    dataset['labelMedium'] == 1,
-    dataset['labelHard'] == 1
-]
-label_choices = ['Easy', 'Medium', 'Hard']
-dataset['label'] = np.select(label_conditions, label_choices, default='None')
-
-# Add a print statement to verify the label distribution
-print("Label distribution before filtering:")
-print(dataset['label'].value_counts())
-
-# Remove rows where no label is present ('None')
-dataset = dataset[dataset['label'] != 'None']
-
-print(f"\nTotal rows after filtering for valid labels: {len(dataset.index)}")
-
-# Drop the original one-hot columns
-dataset = dataset.drop(one_hot_labels, axis=1, errors='ignore')
-
-
 # Let us create our visualization class again.
 DataViz = VisualizeDataset(__file__)
 
-# We create a single column with the categorical attribute representing our class. Furthermore, we use 70% of our data
-# for training and the remaining 30% as an independent test set. We select the sets based on stratified sampling. We remove
-# cases where we do not know the label.
-
+# We create a single column with the categorical attribute representing our class.
 prepare = PrepareDatasetForLearning()
-print(dataset.head())
 
+# --- MODIFIED: We call the function with 'like' to trigger its internal label processing. ---
+# The function will find 'labelEasy', 'labelMedium', etc., and create a 'class' column.
 train_X, test_X, train_y, test_y = prepare.split_single_dataset_classification(dataset, ['label'], 'like', 0.7,
                                                                                filter=True, temporal=False)
 
@@ -101,9 +65,8 @@ basic_features = ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)',
                   'mag_X (µT)', 'mag_Y (µT)', 'mag_Z (µT)',
                   'loc_Height (m)', 'loc_Velocity (m/s)']
 pca_features = ['pca_1', 'pca_2', 'pca_3', 'pca_4', 'pca_5', 'pca_6', 'pca_7']
-# These are generated dynamically and should work out of the box
-time_features = [name for name in dataset.columns if '_temp_' in name]
-freq_features = [name for name in dataset.columns if (('_freq' in name) or ('_pse' in name))]
+time_features = [name for name in train_X.columns if '_temp_' in name]
+freq_features = [name for name in train_X.columns if (('_freq' in name) or ('_pse' in name))]
 cluster_features = ['cluster']
 
 # Filter to only include columns that actually exist in the training data
@@ -203,6 +166,10 @@ print("--- Starting main classification loop ---")
 scores_over_all_algs = []
 
 for i in range(0, len(possible_feature_sets)):
+    # Make sure the feature set is not empty
+    if not possible_feature_sets[i]:
+        print(f"Skipping feature set '{feature_names[i]}' as it contains no features.")
+        continue
     selected_train_X = train_X[possible_feature_sets[i]]
     selected_test_X = test_X[possible_feature_sets[i]]
 
@@ -285,17 +252,21 @@ DataViz.plot_performances_classification(['NN', 'RF', 'SVM', 'KNN', 'DT', 'NB'],
 # And we study two promising ones in more detail.
 print("\nDetailed analysis of Decision Tree and Random Forest with selected features...")
 
-print("\nDecision Tree Details:")
-class_train_y_dt, class_test_y_dt, class_train_prob_y_dt, class_test_prob_y_dt = learner.decision_tree(
-    train_X[selected_features], train_y, test_X[selected_features],
-    gridsearch=True,
-    print_model_details=True, export_tree_path=EXPORT_TREE_PATH)
-print("\nRandom Forest Details:")
-class_train_y_rf, class_test_y_rf, class_train_prob_y_rf, class_test_prob_y_rf = learner.random_forest(
-    train_X[selected_features], train_y, test_X[selected_features],
-    gridsearch=True, print_model_details=True)
+# Make sure selected_features is not empty before proceeding
+if not selected_features:
+    print("No features were selected, skipping detailed analysis.")
+else:
+    print("\nDecision Tree Details:")
+    class_train_y_dt, class_test_y_dt, class_train_prob_y_dt, class_test_prob_y_dt = learner.decision_tree(
+        train_X[selected_features], train_y, test_X[selected_features],
+        gridsearch=True,
+        print_model_details=True, export_tree_path=EXPORT_TREE_PATH)
+    print("\nRandom Forest Details:")
+    class_train_y_rf, class_test_y_rf, class_train_prob_y_rf, class_test_prob_y_rf = learner.random_forest(
+        train_X[selected_features], train_y, test_X[selected_features],
+        gridsearch=True, print_model_details=True)
 
-# Using the Random Forest for the confusion matrix as it's often a strong performer
-test_cm = eval.confusion_matrix(test_y, class_test_y_rf, class_train_prob_y_rf.columns)
+    # Using the Random Forest for the confusion matrix as it's often a strong performer
+    test_cm = eval.confusion_matrix(test_y, class_test_y_rf, class_train_prob_y_rf.columns)
 
-DataViz.plot_confusion_matrix(test_cm, class_train_prob_y_rf.columns, normalize=False)
+    DataViz.plot_confusion_matrix(test_cm, class_train_prob_y_rf.columns, normalize=False)
