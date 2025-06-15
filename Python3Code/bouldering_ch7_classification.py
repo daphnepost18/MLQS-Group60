@@ -79,7 +79,7 @@ def main():
         DataViz = VisualizeDataset(__file__)
         prepare = PrepareDatasetForLearning()
 
-        train_X, test_X, train_y, test_y = prepare.split_single_dataset_classification(dataset, ['label'], 'like', 0.7,
+        train_X, test_X, train_y, test_y = prepare.split_single_dataset_classification(dataset, ['label'], 'like', 0.8,
                                                                                        filter=True, temporal=False)
 
         print('Training set length is: ', len(train_X.index))
