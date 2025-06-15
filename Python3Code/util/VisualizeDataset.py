@@ -521,6 +521,41 @@ class VisualizeDataset:
         self.save(plt, prefix=file_prefix)
         plt.close('all')
 
+    def plot_feature_importances(self, importances, feature_names, dataset_name=None, method=None):
+        """
+        Plots feature importances as a horizontal bar chart.
+
+        Args:
+            importances (array-like): The importance scores for each feature.
+            feature_names (array-like): The names of the features.
+            dataset_name (str, optional): The name of the dataset for titling. Defaults to None.
+            method (str, optional): The name of the method (e.g., 'RandomForest') for titling and saving. Defaults to None.
+        """
+        feature_importances = pd.Series(importances, index=feature_names)
+        feature_importances.sort_values(ascending=True, inplace=True)
+        fig, ax = plt.subplots(figsize=(10, 8))
+        ax.barh(feature_importances.index, feature_importances.values)
+
+        ax.set_xlabel("Feature Importance")
+        ax.set_ylabel("Features")
+
+        title = "Feature Importance"
+        if method:
+            title = f"Feature Importance: {method}"
+        if dataset_name:
+            title = f"{title} ({dataset_name})"
+        ax.set_title(title)
+        plt.tight_layout()
+
+        file_prefix = 'feature_importance'
+        if dataset_name:
+            file_prefix = f"{file_prefix}_{dataset_name.replace(' ', '_')}"
+        if method:
+            file_prefix = f"{file_prefix}_{method.replace(' ', '_')}"
+
+        self.save(plt, prefix=file_prefix)
+        plt.close('all')
+
     def plot_numerical_prediction_versus_real(self, train_time, train_y, regr_train_y, test_time, test_y, regr_test_y,
                                               label):
         self.legends = {}
@@ -585,7 +620,7 @@ class VisualizeDataset:
         self.plot_numerical_prediction_versus_real(train_time, train_y, regr_train_y, test_time, test_y, regr_test_y,
                                                    label)
 
-    def plot_performances(self, algs, feature_subset_names, scores_over_all_algs, ylim, std_mult, y_name):
+    def plot_performances(self, algs, feature_subset_names, scores_over_all_algs, ylim, std_mult, y_name, dataset_name):
         width = float(1) / (len(feature_subset_names) + 1)
         ind = np.arange(len(algs))
 
@@ -611,11 +646,11 @@ class VisualizeDataset:
 
         plt.subplots_adjust(bottom=0.2)
 
-        self.save(plt)
+        self.save(plt, prefix=dataset_name)
         plt.close('all')
 
-    def plot_performances_classification(self, algs, feature_subset_names, scores_over_all_algs):
-        self.plot_performances(algs, feature_subset_names, scores_over_all_algs, None, 2, 'Accuracy')
+    def plot_performances_classification(self, algs, feature_subset_names, scores_over_all_algs, dataset_name):
+        self.plot_performances(algs, feature_subset_names, scores_over_all_algs, None, 2, 'Accuracy',dataset_name)
 
     def plot_performances_regression(self, algs, feature_subset_names, scores_over_all_algs):
         self.plot_performances(algs, feature_subset_names, scores_over_all_algs, None, 1, 'Mean Squared Error')

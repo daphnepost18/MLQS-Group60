@@ -211,11 +211,11 @@ def main():
                 performance_te_svm += eval.accuracy(test_y, c_test_y)
                 if repeat == N_KCV_REPEATS - 1: last_pred_svm, last_prob_svm = c_test_y, c_train_p
 
-            performance_tr_nn /= N_KCV_REPEATS;
+            performance_tr_nn /= N_KCV_REPEATS
             performance_te_nn /= N_KCV_REPEATS
-            performance_tr_rf /= N_KCV_REPEATS;
+            performance_tr_rf /= N_KCV_REPEATS
             performance_te_rf /= N_KCV_REPEATS
-            performance_tr_svm /= N_KCV_REPEATS;
+            performance_tr_svm /= N_KCV_REPEATS
             performance_te_svm /= N_KCV_REPEATS
 
             print("\nGenerating confusion matrices for non-deterministic models...")
@@ -234,7 +234,7 @@ def main():
             print("Training K-Nearest Neighbor...")
             c_train_y_knn, c_test_y_knn, c_train_p_knn, _ = learner.k_nearest_neighbor(selected_train_X, train_y,
                                                                                        selected_test_X, gridsearch=True)
-            performance_tr_knn = eval.accuracy(train_y, c_train_y_knn);
+            performance_tr_knn = eval.accuracy(train_y, c_train_y_knn)
             performance_te_knn = eval.accuracy(test_y, c_test_y_knn)
             cm_knn = eval.confusion_matrix(test_y, c_test_y_knn, c_train_p_knn.columns)
             DataViz.plot_confusion_matrix(cm_knn, c_train_p_knn.columns, normalize=False, dataset_name=dataset_name,
@@ -242,14 +242,14 @@ def main():
             print("Training Decision Tree...")
             c_train_y_dt, c_test_y_dt, c_train_p_dt, _ = learner.decision_tree(selected_train_X, train_y,
                                                                                selected_test_X, gridsearch=True)
-            performance_tr_dt = eval.accuracy(train_y, c_train_y_dt);
+            performance_tr_dt = eval.accuracy(train_y, c_train_y_dt)
             performance_te_dt = eval.accuracy(test_y, c_test_y_dt)
             cm_dt = eval.confusion_matrix(test_y, c_test_y_dt, c_train_p_dt.columns)
             DataViz.plot_confusion_matrix(cm_dt, c_train_p_dt.columns, normalize=False, dataset_name=dataset_name,
                                           method=f'{feature_names[i]}_DT')
             print("Training Naive Bayes...")
             c_train_y_nb, c_test_y_nb, c_train_p_nb, _ = learner.naive_bayes(selected_train_X, train_y, selected_test_X)
-            performance_tr_nb = eval.accuracy(train_y, c_train_y_nb);
+            performance_tr_nb = eval.accuracy(train_y, c_train_y_nb)
             performance_te_nb = eval.accuracy(test_y, c_test_y_nb)
             cm_nb = eval.confusion_matrix(test_y, c_test_y_nb, c_train_p_nb.columns)
             DataViz.plot_confusion_matrix(cm_nb, c_train_p_nb.columns, normalize=False, dataset_name=dataset_name,
