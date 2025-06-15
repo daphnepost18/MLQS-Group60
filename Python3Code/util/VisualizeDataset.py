@@ -41,34 +41,26 @@ class VisualizeDataset:
         print(f'Figure saved to {save_path}')
         self.plot_number += 1
 
-    def plot_dataset_boxplot(self, dataset, cols, participant_name=None, dataset_name=None):
+    def plot_dataset_boxplot(self, dataset, cols, dataset_name=None):
         # FIX: Changed plt.Figure() to plt.figure() to ensure a new figure is created for each plot.
         plt.figure()
         dataset[cols].plot.box()
 
         title_str = ""
-        if participant_name and dataset_name:
-            title_str = f"Boxplot for Participant: {participant_name}, Dataset: {dataset_name}"
-        elif participant_name:
-            title_str = f"Boxplot for Participant: {participant_name}"
-        elif dataset_name:
+        if dataset_name:
             title_str = f"Boxplot for Dataset: {dataset_name}"
 
         if title_str:
             plt.title(title_str, fontsize=14)
 
         file_prefix = None
-        if participant_name and dataset_name:
-            file_prefix = f"boxplot_{participant_name.replace(' ', '_')}_{dataset_name.replace(' ', '_')}"
-        elif participant_name:
-            file_prefix = f"boxplot_{participant_name.replace(' ', '_')}"
-        elif dataset_name:
+        if dataset_name:
             file_prefix = f"boxplot_{dataset_name.replace(' ', '_')}"
 
         self.save(plt, prefix=file_prefix)
         plt.close('all')
 
-    def plot_dataset(self, data_table, columns, match='like', display='line', participant_name=None, dataset_name=None, method=None):
+    def plot_dataset(self, data_table, columns, match='like', display='line', dataset_name=None, method=None):
         data_table.index = pd.to_datetime(data_table.index)
         names = list(data_table.columns)
 
@@ -132,25 +124,15 @@ class VisualizeDataset:
         plt.xlabel('time')
 
         title_str = ""
-        if participant_name and dataset_name:
-            title_str = f"Data for Participant: {participant_name}, Dataset: {dataset_name}"
-        elif participant_name:
-            title_str = f"Data for Participant: {participant_name}"
-        elif dataset_name:
+        if dataset_name:
             title_str = f"Data for Dataset: {dataset_name}"
 
         if title_str:
             plt.suptitle(title_str, fontsize=16)
 
         file_prefix = None
-        if participant_name and dataset_name and method:
-            file_prefix = f"plot_{participant_name.replace(' ', '_')}_{dataset_name.replace(' ', '_')}_{method}"
-        elif dataset_name and method:
+        if dataset_name and method:
             file_prefix = f"plot_{dataset_name.replace(' ', '_')}_{method}"
-        elif participant_name and dataset_name:
-            file_prefix = f"plot_{participant_name.replace(' ', '_')}_{dataset_name.replace(' ', '_')}"
-        elif participant_name:
-            file_prefix = f"plot_{participant_name.replace(' ', '_')}"
         elif dataset_name:
             file_prefix = f"plot_{dataset_name.replace(' ', '_')}"
 
