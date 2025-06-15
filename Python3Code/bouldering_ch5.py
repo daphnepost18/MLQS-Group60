@@ -52,6 +52,7 @@ def main():
         # Construct the base name for the output file
         # Example: chapter4_result_participant1_Easy1_250.csv -> chapter5_result_participant1_Easy1_250.csv
         base_output_name = input_file_path.name.replace('chapter4_result_', 'chapter5_result_')
+        dataset_name = input_file_path.name.replace('chapter4_result_', '').replace('.csv', '')
 
         if FLAGS.mode == 'kmeans':
             # Let us look at k-means first.
@@ -70,7 +71,7 @@ def main():
                 silhouette_values.append(silhouette_score)
 
             DataViz.plot_xy(x=[k_values], y=[silhouette_values], xlabel='k', ylabel='silhouette score',
-                            ylim=[0, 1], line_styles=['b-'])
+                            ylim=[0, 1], line_styles=['b-'], dataset_name=dataset_name, methodch3='Kmeans')
 
             # And run the knn with the highest silhouette score
 
@@ -94,7 +95,7 @@ def main():
                 silhouette_values.append(silhouette_score)
 
             DataViz.plot_xy(x=[k_values], y=[silhouette_values], xlabel='k', ylabel='silhouette score',
-                            ylim=[0, 1], line_styles=['b-'])
+                            ylim=[0, 1], line_styles=['b-'], dataset_name=dataset_name, methodch3='Kmeans')
 
             # And run k medoids with the highest silhouette score
 
@@ -104,8 +105,9 @@ def main():
             dataset_kmed = clusteringNH.k_medoids_over_instances(copy.deepcopy(dataset), [
                 'acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)'], k, 'default', 20, n_inits=50)
             DataViz.plot_clusters_3d(dataset_kmed, [
-                'acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)'], 'cluster', ['label'])
-            DataViz.plot_silhouette(dataset_kmed, 'cluster', 'silhouette')
+                'acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)'], 'cluster', ['label'],
+                                     dataset_name=dataset_name, method='Kmediods')
+            DataViz.plot_silhouette(dataset_kmed, 'cluster', 'silhouette',dataset_name=dataset_name, method='Kmediods')
             util.print_latex_statistics_clusters(dataset_kmed, 'cluster', [
                 'acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)'], 'label')
 
@@ -127,10 +129,10 @@ def main():
                 print(f'silhouette = {silhouette_score}')
                 silhouette_values.append(silhouette_score)
                 if k == k_values[0]:
-                    DataViz.plot_dendrogram(dataset, l)
+                    DataViz.plot_dendrogram(dataset, l, dataset_name=dataset_name, method='agglomerative')
 
             DataViz.plot_xy(x=[k_values], y=[silhouette_values], xlabel='k', ylabel='silhouette score',
-                            ylim=[0, 1], line_styles=['b-'])
+                            ylim=[0, 1], line_styles=['b-'], dataset_name=dataset_name, methodch3='agglomerative')
 
         if FLAGS.mode == 'final':
             # And we select the outcome dataset of the knn clustering....
@@ -138,8 +140,9 @@ def main():
 
             dataset = clusteringNH.k_means_over_instances(dataset, ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)'], FLAGS.k,
                                                           'default', 50, 50)
-            DataViz.plot_clusters_3d(dataset, ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)'], 'cluster', ['label'])
-            DataViz.plot_silhouette(dataset, 'cluster', 'silhouette')
+            DataViz.plot_clusters_3d(dataset, ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)'], 'cluster', ['label'],
+                                     dataset_name=dataset_name, method='Final')
+            DataViz.plot_silhouette(dataset, 'cluster', 'silhouette', dataset_name=dataset_name, method='Final')
             util.print_latex_statistics_clusters(
                 dataset, 'cluster', ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)'], 'label')
             del dataset['silhouette']

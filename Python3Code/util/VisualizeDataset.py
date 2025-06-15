@@ -154,7 +154,7 @@ class VisualizeDataset:
         plt.close('all')
 
     def plot_xy(self, x, y, method='plot', xlabel=None, ylabel=None, xlim=None, ylim=None, names=None,
-                line_styles=None, loc=None, title=None):
+                line_styles=None, loc=None, title=None, dataset_name=None, methodch3=None):
         for input in x, y:
             if not hasattr(input[0], '__iter__'):
                 raise TypeError('x/y should be given as a list of lists of coordinates')
@@ -171,7 +171,7 @@ class VisualizeDataset:
             if title is not None: plt.title(title)
             if names is not None: plt.legend(names)
 
-        self.save(plt)
+        self.save(plt, prefix=f"{dataset_name}_{methodch3}")
         plt.close('all')
 
     def plot_feature_distributions_across_datasets(self, datasets, feature_cols, dataset_labels, main_title=None):
@@ -410,7 +410,7 @@ class VisualizeDataset:
         self.save(plt)
         plt.close('all')
 
-    def plot_clusters_3d(self, data_table, data_cols, cluster_col, label_cols):
+    def plot_clusters_3d(self, data_table, data_cols, cluster_col, label_cols, dataset_name=None, method=None):
 
         color_index = 0
         point_displays = ['+', 'x', '*', 'd', 'o', 's', '<', '>']
@@ -444,10 +444,10 @@ class VisualizeDataset:
             color_index += 1
 
         plt.legend(handles, labels, fontsize='xx-small', numpoints=1)
-        self.save(plt)
+        self.save(plt, prefix=f"{dataset_name}_{method}")
         plt.close('all')
 
-    def plot_silhouette(self, data_table, cluster_col, silhouette_col):
+    def plot_silhouette(self, data_table, cluster_col, silhouette_col, dataset_name=None, method=None):
 
         clusters = data_table[cluster_col].unique()
 
@@ -479,10 +479,10 @@ class VisualizeDataset:
 
         ax1.set_yticks([])
         ax1.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
-        self.save(plt)
+        self.save(plt, prefix=f"{dataset_name}_{method}")
         plt.close('all')
 
-    def plot_dendrogram(self, dataset, linkage):
+    def plot_dendrogram(self, dataset, linkage, dataset_name=None, method=None):
         sys.setrecursionlimit(40000)
         plt.title('Hierarchical Clustering Dendrogram')
         plt.xlabel('time points')
@@ -490,7 +490,7 @@ class VisualizeDataset:
         times = dataset.index.strftime('%H:%M:%S')
         dendrogram(linkage, truncate_mode='lastp', p=16, show_leaf_counts=True, leaf_rotation=45., leaf_font_size=8.,
                    show_contracted=True, labels=times)
-        self.save(plt)
+        self.save(plt, prefix=f"{dataset_name}_{method}")
         plt.close('all')
 
     def plot_confusion_matrix(self, cm, classes, normalize=False):
