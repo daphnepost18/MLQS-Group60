@@ -98,8 +98,8 @@ def main():
             print(f"Results for {input_file_path.name} saved to: {output_file}")
 
         if FLAGS.mode == 'final':
-            ws = int(30000 / milliseconds_per_instance)
-            fs = 1000 / milliseconds_per_instance
+            ws = int(3000 / milliseconds_per_instance)
+            fs = 100 / milliseconds_per_instance
 
             selected_predictor_cols = [c for c in dataset.columns
                                        if 'label' not in c and pd.api.types.is_numeric_dtype(dataset[c]) and not pd.api.types.is_bool_dtype(dataset[c])]
@@ -123,18 +123,19 @@ def main():
             label_cols = [col for col in dataset.columns if col.startswith('label')]
             if label_cols:
                 dataset = CatAbs.abstract_categorical(dataset, ['label'], ['like'], 0.03,
-                                                      int(300000 / milliseconds_per_instance), 2)
+                                                      ws, 2)
             else:
                 print(f"Warning: No label columns found in {input_file_path.name}. Skipping categorical abstraction.")
 
             periodic_predictor_cols = ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)',
                                        "gyr_X (rad/s)","gyr_Y (rad/s)","gyr_Z (rad/s)",
-                                       "mag_X (µT)","mag_Y (µT)","mag_Z (µT)"]
+                                       "mag_X (µT)","mag_Y (µT)","mag_Z (µT)",
+                                       "loc_Height (m)","loc_Velocity (m/s)"]
             periodic_measurements_for_freq = [col for col in periodic_predictor_cols
                                               if col in dataset.columns and pd.api.types.is_numeric_dtype(dataset[col])]
             if periodic_measurements_for_freq:
                 dataset = FreqAbs.abstract_frequency(copy.deepcopy(dataset), periodic_measurements_for_freq,
-                                                     int(10000 / milliseconds_per_instance), fs)
+                                                     ws, fs)
             else:
                 print(f"Warning: No valid periodic measurements found in {input_file_path.name}. Skipping.")
 
