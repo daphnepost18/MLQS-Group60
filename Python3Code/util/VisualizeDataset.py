@@ -68,7 +68,7 @@ class VisualizeDataset:
         self.save(plt, prefix=file_prefix)
         plt.close('all')
 
-    def plot_dataset(self, data_table, columns, match='like', display='line', participant_name=None, dataset_name=None):
+    def plot_dataset(self, data_table, columns, match='like', display='line', participant_name=None, dataset_name=None, method=None):
         data_table.index = pd.to_datetime(data_table.index)
         names = list(data_table.columns)
 
@@ -143,7 +143,11 @@ class VisualizeDataset:
             plt.suptitle(title_str, fontsize=16)
 
         file_prefix = None
-        if participant_name and dataset_name:
+        if participant_name and dataset_name and method:
+            file_prefix = f"plot_{participant_name.replace(' ', '_')}_{dataset_name.replace(' ', '_')}_{method}"
+        elif dataset_name and method:
+            file_prefix = f"plot_{dataset_name.replace(' ', '_')}_{method}"
+        elif participant_name and dataset_name:
             file_prefix = f"plot_{participant_name.replace(' ', '_')}_{dataset_name.replace(' ', '_')}"
         elif participant_name:
             file_prefix = f"plot_{participant_name.replace(' ', '_')}"
@@ -366,7 +370,7 @@ class VisualizeDataset:
         file_prefix = "all_features_over_relative_time_multi_dataset" if use_relative_time else "all_features_over_time_multi_dataset"
         self.save(fig, prefix=file_prefix)
 
-    def plot_binary_outliers(self, data_table, col, outlier_col):
+    def plot_binary_outliers(self, data_table, col, outlier_col, dataset_name=None, method=None):
         data_table.loc[:, :] = data_table.dropna(axis=0, subset=[col, outlier_col])
         data_table.loc[:, outlier_col] = data_table[outlier_col].astype('bool')
         f, xar = plt.subplots()
@@ -378,7 +382,7 @@ class VisualizeDataset:
         xar.plot(data_table.index[~data_table[outlier_col]], data_table[col][~data_table[outlier_col]], 'b+')
         plt.legend(['outlier ' + col, 'no_outlier_' + col], numpoints=1, fontsize='xx-small', loc='upper center',
                    ncol=2, fancybox=True, shadow=True)
-        self.save(plt)
+        self.save(plt,prefix=f"({dataset_name}_{method}")
         plt.close('all')
 
     def plot_imputed_values(self, data_table, names, col, *values):

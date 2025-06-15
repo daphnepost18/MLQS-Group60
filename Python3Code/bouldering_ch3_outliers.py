@@ -61,13 +61,14 @@ def main():
 
         # Construct the base name for the output file
         base_output_name = input_file_path.name.replace('chapter2_result_', 'chapter3_result_outliers_')
+        dataset_name = input_file_path.name.replace('chapter2_result_', '')
 
         if FLAGS.mode == 'chauvenet':
             for col in outlier_columns:
                 print(f"Applying Chauvenet outlier criteria for column {col}")
                 dataset = OutlierDistr.chauvenet(dataset, col, FLAGS.C)
                 DataViz.plot_binary_outliers(
-                    dataset, col, col + '_outlier')
+                    dataset, col, col + '_outlier', dataset_name=dataset_name, method='Chauvenet')
             output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_chauvenet_C{FLAGS.C}.csv'
             dataset.to_csv(output_file)
             print(f"Results saved to: {output_file}")
@@ -78,7 +79,7 @@ def main():
                 print(f"Applying mixture model for column {col}")
                 dataset = OutlierDistr.mixture_model(dataset, col)
                 DataViz.plot_dataset(dataset, [
-                    col, col + '_mixture'], ['exact', 'exact'], ['line', 'points'])
+                    col, col + '_mixture'], ['exact', 'exact'], ['line', 'points'], dataset_name=dataset_name, method='Mixture')
                 # This requires:
                 # n_data_points * n_data_points * point_size =
                 # 31839 * 31839 * 32 bits = ~4GB available memory
@@ -92,7 +93,7 @@ def main():
                     dataset = OutlierDist.simple_distance_based(
                         dataset, [col], 'euclidean', FLAGS.dmin, FLAGS.fmin)
                     DataViz.plot_binary_outliers(
-                        dataset, col, 'simple_dist_outlier')
+                        dataset, col, 'simple_dist_outlier', dataset_name=dataset_name, method='DistanceBased')
                 except MemoryError as e:
                     print(
                         'Not enough memory available for simple distance-based outlier detection...')
@@ -107,7 +108,7 @@ def main():
                     dataset = OutlierDist.local_outlier_factor(
                         dataset, [col], 'euclidean', FLAGS.K)
                     DataViz.plot_dataset(dataset, [col, 'lof'], [
-                        'exact', 'exact'], ['line', 'points'])
+                        'exact', 'exact'], ['line', 'points'], dataset_name=dataset_name, method='LOF')
                 except MemoryError as e:
                     print('Not enough memory available for lof...')
                     print('Skipping.')
