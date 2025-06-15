@@ -364,7 +364,7 @@ class VisualizeDataset:
         xar.plot(data_table.index[~data_table[outlier_col]], data_table[col][~data_table[outlier_col]], 'b+')
         plt.legend(['outlier ' + col, 'no_outlier_' + col], numpoints=1, fontsize='xx-small', loc='upper center',
                    ncol=2, fancybox=True, shadow=True)
-        self.save(plt,prefix=f"({dataset_name}_{method}")
+        self.save(plt,prefix=f"{dataset_name}_{method}")
         plt.close('all')
 
     def plot_imputed_values(self, data_table, names, col, *values, dataset_name=None, method=None):
