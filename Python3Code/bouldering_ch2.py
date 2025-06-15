@@ -158,28 +158,52 @@ if len(all_fine_grained_datasets_overall) > 0:
 print('\nThe code has run through successfully!')
 
 # ---------------------------------------------------------------------------
-# NEW CODE: Combine all generated CSV files into a single master file.
+# NEW CODE:
+# Combine all CSV files into a single file, adjusting timestamps to make them sequential.
 # ---------------------------------------------------------------------------
-print('\nCombining all individual result CSVs into a single file...')
+print('\nCombining all individual result CSVs into a single sequential file...')
 search_pattern = RESULT_PATH / 'chapter2_result_*.csv'
 all_csv_files = glob.glob(str(search_pattern))
 
-final_filename_str = 'chapter2_result_participant1_combined.csv'
-csv_files_to_combine = [f for f in all_csv_files if final_filename_str not in f]
+final_filename_str = 'chapter2_result_participant1_combined_seq.csv'
+csv_files_to_combine = [f for f in all_csv_files if 'combined' not in f]
+csv_files_to_combine.sort()
 
 if csv_files_to_combine:
-    df_list = []
-    for file in csv_files_to_combine:
-        df = pd.read_csv(file, index_col=0)
-        df_list.append(df)
+    adjusted_dfs = []
+    last_timestamp = None
+    sampling_interval = None
 
-    combined_df = pd.concat(df_list).sort_index()
+    for file in csv_files_to_combine:
+        print(f"Processing and adjusting timestamps for {file}...")
+        df = pd.read_csv(file, index_col=0)
+        df.index = pd.to_datetime(df.index)
+
+        if sampling_interval is None and len(df.index) > 1:
+            sampling_interval = df.index[1] - df.index[0]
+
+        if last_timestamp is None:
+            print("  This is the first file. Setting as baseline.")
+        else:
+            current_start_time = df.index.min()
+            new_start_time = last_timestamp + sampling_interval
+            time_shift = new_start_time - current_start_time
+
+            print(f"  Shifting timestamps by: {time_shift}")
+            df.index = df.index + time_shift
+
+        last_timestamp = df.index.max()
+        adjusted_dfs.append(df)
+
+    combined_df = pd.concat(adjusted_dfs)
+    combined_df.sort_index(inplace=True)
+
     output_path = RESULT_PATH / final_filename_str
     combined_df.to_csv(output_path)
 
-    print(f'Successfully combined {len(csv_files_to_combine)} files into: {output_path}')
+    print(f'\nSuccessfully combined and adjusted {len(csv_files_to_combine)} files into: {output_path}')
 
-    print('\n--- Statistics for the Combined Dataset ---')
+    print('\n--- Statistics for the Combined Sequential Dataset ---')
     util.print_statistics(combined_df)
 
 else:
