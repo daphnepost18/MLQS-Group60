@@ -68,7 +68,7 @@ def main():
             continue
 
         dataset_name = input_file_path.stem.replace('chapter5_result_', '')
-        EXPORT_TREE_PATH = Path(f'./figures/bouldering_ch7_{dataset_name}/')
+        EXPORT_TREE_PATH = Path(f'./figures/bouldering_ch7_classification/')
         EXPORT_TREE_PATH.mkdir(exist_ok=True, parents=True)
 
         DataViz = VisualizeDataset(__file__)
