@@ -116,7 +116,7 @@ def main():
                     dataset = OutlierDist.local_outlier_factor(
                         dataset, [col], 'euclidean', FLAGS.K)
                     DataViz.plot_dataset(dataset, [col, 'lof'], [
-                        'exact', 'exact'], ['line', 'points'], dataset_name=dataset_name, method='LOF')
+                        'exact', 'exact'], ['line', 'points'], dataset_name=dataset_name, method=f"LOF_K{FLAGS.K}")
                 except MemoryError as e:
                     print('Not enough memory available for lof...')
                     print('Skipping.')

@@ -124,11 +124,11 @@ class VisualizeDataset:
         plt.xlabel('time')
 
         title_str = ""
-        if dataset_name:
-            title_str = f"Data for Dataset: {dataset_name}"
+        if method:
+            title_str = f"Plot for {method} Method"
 
         if title_str:
-            plt.suptitle(title_str, fontsize=16)
+            plt.suptitle(title_str, fontsize=14)
 
         file_prefix = None
         if dataset_name and method:
