@@ -72,7 +72,6 @@ class VisualizeDataset:
 
         f.subplots_adjust(hspace=0.4)
 
-        # FIX: Changed the format string to '%H:%M:%S' to remove milliseconds.
         xfmt = md.DateFormatter('%H:%M:%S')
 
         for i in range(0, len(columns)):
@@ -102,8 +101,10 @@ class VisualizeDataset:
                                 self.line_displays[j % len(self.line_displays)])
 
             xar[i].tick_params(axis='y', labelsize=10)
+
+            # MODIFIED: Lowered the legend's vertical position from 1.3 to 1.15 to bring it closer to the plot.
             xar[i].legend(relevant_cols, fontsize='xx-small', numpoints=1, loc='upper center',
-                          bbox_to_anchor=(0.5, 1.3), ncol=len(relevant_cols), fancybox=True, shadow=True)
+                          bbox_to_anchor=(0.5, 1.15), ncol=len(relevant_cols), fancybox=True, shadow=True)
 
             if min_values and max_values:
                 filtered_min_values = [v for v in min_values if pd.notna(v)]
@@ -125,7 +126,7 @@ class VisualizeDataset:
 
         title_str = ""
         if method:
-            title_str = f"Plot for {method} Method"
+            title_str = f"Plot for {method}"
 
         if title_str:
             plt.suptitle(title_str, fontsize=14)
@@ -135,6 +136,10 @@ class VisualizeDataset:
             file_prefix = f"plot_{dataset_name.replace(' ', '_')}_{method}"
         elif dataset_name:
             file_prefix = f"plot_{dataset_name.replace(' ', '_')}"
+
+        # MODIFIED: Added tight_layout to automatically adjust spacing and prevent overlaps.
+        # The 'rect' argument makes space for the suptitle [left, bottom, right, top].
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 
         self.save(plt, prefix=file_prefix)
         plt.close('all')
