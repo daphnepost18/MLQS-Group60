@@ -1,4 +1,0 @@
-sensor_type,device_type,label,label_start,label_start_datetime,label_end,label_end_datetime
-interval_label,smartphone,Easy,1.748973519219974E9,03/06/2025 19:58:39,1.748973554433692E9,03/06/2025 19:59:14
-interval_label,smartphone,Easy,1.748975035483710E9,03/06/2025 20:23:55,1.748975065377941E9,03/06/2025 20:24:25
-interval_label,smartphone,Medium,1.748974943646875E9,03/06/2025 20:22:23,1.748974977304483E9,03/06/2025 20:22:57

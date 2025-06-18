@@ -33,9 +33,6 @@ all_fine_grained_datasets_overall = []
 all_fine_grained_dataset_names_overall = []
 
 for dataset_folder_name_raw in os.listdir(ROOT_DATA_PATH):
-    if dataset_folder_name_raw == 'Labels.csv':
-        continue
-
     DATASET_PATH = ROOT_DATA_PATH / dataset_folder_name_raw
 
     if not DATASET_PATH.is_dir():
