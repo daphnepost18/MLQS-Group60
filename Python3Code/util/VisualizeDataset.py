@@ -102,9 +102,9 @@ class VisualizeDataset:
 
             xar[i].tick_params(axis='y', labelsize=10)
 
-            # MODIFIED: Lowered the legend's vertical position from 1.3 to 1.15 to bring it closer to the plot.
-            xar[i].legend(relevant_cols, fontsize='xx-small', numpoints=1, loc='upper center',
-                          bbox_to_anchor=(0.5, 1.15), ncol=len(relevant_cols), fancybox=True, shadow=True)
+            # MODIFIED: Changed legend position to be on the right side of the plot.
+            xar[i].legend(relevant_cols, fontsize='xx-small', numpoints=1, loc='center left',
+                          bbox_to_anchor=(1.02, 0.5), ncol=1, fancybox=True, shadow=True)
 
             if min_values and max_values:
                 filtered_min_values = [v for v in min_values if pd.notna(v)]
@@ -137,9 +137,9 @@ class VisualizeDataset:
         elif dataset_name:
             file_prefix = f"plot_{dataset_name.replace(' ', '_')}"
 
-        # MODIFIED: Added tight_layout to automatically adjust spacing and prevent overlaps.
-        # The 'rect' argument makes space for the suptitle [left, bottom, right, top].
-        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        # MODIFIED: Adjusted the 'right' boundary in the rect to make space for the legend.
+        # The value 0.85 means the plots will occupy the left 85% of the figure area.
+        plt.tight_layout(rect=[0, 0.03, 0.98, 0.95])
 
         self.save(plt, prefix=file_prefix)
         plt.close('all')

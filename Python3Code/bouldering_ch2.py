@@ -31,6 +31,8 @@ print('Please wait, this will take a while to run!')
 
 all_fine_grained_datasets_overall = []
 all_fine_grained_dataset_names_overall = []
+# NEW: Dictionary to store the start time for each dataset, mapping name to timestamp.
+folder_timestamps = {}
 
 for dataset_folder_name_raw in os.listdir(ROOT_DATA_PATH):
     DATASET_PATH = ROOT_DATA_PATH / dataset_folder_name_raw
@@ -50,6 +52,8 @@ for dataset_folder_name_raw in os.listdir(ROOT_DATA_PATH):
         time_str = time_components[1].replace('-', ':')
         BOULDERING_START_TIME_FOR_RELATIVE_DATA = datetime.strptime(f"{date_str} {time_str}", '%Y-%m-%d %H:%M:%S')
         print(f"Using folder timestamp as anchor: {BOULDERING_START_TIME_FOR_RELATIVE_DATA}")
+        # NEW: Store the parsed timestamp in our dictionary with the short dataset name as the key.
+        folder_timestamps[dataset_name] = BOULDERING_START_TIME_FOR_RELATIVE_DATA
     except (ValueError, IndexError) as e:
         print(
             f"Warning: Could not parse timestamp from folder name '{dataset_folder_name_raw}'. Error: {e}. Skipping folder.")
@@ -91,24 +95,11 @@ for dataset_folder_name_raw in os.listdir(ROOT_DATA_PATH):
         elif 'Hard' in dataset_name:
             dataset['labelHard'] = 1
 
-        # DataViz.plot_dataset_boxplot(dataset, ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)'],
-        #                             dataset_name=dataset_name)
-        # DataViz.plot_dataset_boxplot(dataset, ["gyr_X (rad/s)", "gyr_Y (rad/s)", "gyr_Z (rad/s)"],
-        #                             dataset_name=dataset_name)
-        # DataViz.plot_dataset_boxplot(dataset, ["mag_X (µT)", "mag_Y (µT)", "mag_Z (µT)"],
-        #                              dataset_name=dataset_name)
-        # DataViz.plot_dataset_boxplot(dataset, ["loc_Height (m)", "loc_Velocity (m/s)"],
-        #                              dataset_name=dataset_name)
-
         DataViz.plot_dataset(dataset, ['acc_', 'gyr_', 'mag_', 'loc_', 'label'],
                              ['like', 'like', 'like', 'like', 'like'], ['line', 'line', 'line', 'line', 'points'],
                              dataset_name=dataset_name)
 
         numerical_cols = [col for col in dataset.columns if 'label' not in col]
-        # DataViz.plot_correlation_heatmap(dataset, columns=numerical_cols,
-        #                                  title=f"Correlation Heatmap for {dataset_name}")
-
-        util.print_statistics(dataset)
         datasets_for_current_folder_granularities.append(copy.deepcopy(dataset))
 
         if ms_per_instance == 250:
@@ -145,7 +136,23 @@ all_csv_files = glob.glob(str(search_pattern))
 
 final_filename_str = 'chapter2_result_combined.csv'
 csv_files_to_combine = [f for f in all_csv_files if 'combined' not in f]
-csv_files_to_combine.sort()
+
+# MODIFIED: Replaced the simple alphabetical sort with a chronological sort.
+# We use the 'folder_timestamps' dictionary we created earlier as a lookup.
+def get_timestamp_for_file(filepath):
+    # Extracts the dataset name (e.g., 'Easy1') from a full filepath.
+    base_name = Path(filepath).stem
+    dataset_name_key = base_name.replace('chapter2_result_', '')
+    # Returns the timestamp for that dataset name. Defaults to a very old time if not found.
+    return folder_timestamps.get(dataset_name_key, datetime.min)
+
+csv_files_to_combine.sort(key=get_timestamp_for_file)
+
+# A printout to confirm the new chronological order.
+print("\nFiles will be combined in the following chronological order:")
+for f in csv_files_to_combine:
+    print(f"  - {Path(f).name}")
+# END OF MODIFIED SECTION
 
 adjusted_dfs = []
 last_timestamp = None
@@ -168,33 +175,36 @@ for file in csv_files_to_combine:
     last_timestamp = df.index.max()
     adjusted_dfs.append(df)
 
-combined_df = pd.concat(adjusted_dfs)
-combined_df.sort_index(inplace=True)
-output_path = RESULT_PATH / final_filename_str
-combined_df.to_csv(output_path)
+if adjusted_dfs:
+    combined_df = pd.concat(adjusted_dfs)
+    combined_df.sort_index(inplace=True)
+    output_path = RESULT_PATH / final_filename_str
+    combined_df.to_csv(output_path)
 
-print('\n--- Statistics for the Combined Sequential Dataset ---')
-util.print_statistics(combined_df)
+    print('\n--- Statistics for the Combined Sequential Dataset ---')
+    util.print_statistics(combined_df)
 
-# ---------------------------------------------------------------------------
-# Visualize the newly created combined dataset.
-# ---------------------------------------------------------------------------
-DataViz_combined = VisualizeDataset(__file__)
-dataset_name_combined = 'Combined'
+    # ---------------------------------------------------------------------------
+    # Visualize the newly created combined dataset.
+    # ---------------------------------------------------------------------------
+    DataViz_combined = VisualizeDataset(__file__)
+    dataset_name_combined = 'Combined'
 
-DataViz_combined.plot_dataset_boxplot(combined_df, ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)'],
-                                                                            dataset_name=dataset_name_combined)
-DataViz_combined.plot_dataset_boxplot(combined_df, ["gyr_X (rad/s)", "gyr_Y (rad/s)", "gyr_Z (rad/s)"],
-                                      dataset_name=dataset_name_combined)
-DataViz_combined.plot_dataset_boxplot(combined_df, ["mag_X (µT)", "mag_Y (µT)", "mag_Z (µT)"],
-                                      dataset_name=dataset_name_combined)
-DataViz_combined.plot_dataset_boxplot(combined_df, ["loc_Height (m)", "loc_Velocity (m/s)"],
-                                      dataset_name=dataset_name_combined)
+    DataViz_combined.plot_dataset_boxplot(combined_df, ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)'],
+                                                                                dataset_name=dataset_name_combined)
+    DataViz_combined.plot_dataset_boxplot(combined_df, ["gyr_X (rad/s)", "gyr_Y (rad/s)", "gyr_Z (rad/s)"],
+                                          dataset_name=dataset_name_combined)
+    DataViz_combined.plot_dataset_boxplot(combined_df, ["mag_X (µT)", "mag_Y (µT)", "mag_Z (µT)"],
+                                          dataset_name=dataset_name_combined)
+    DataViz_combined.plot_dataset_boxplot(combined_df, ["loc_Height (m)", "loc_Velocity (m/s)"],
+                                          dataset_name=dataset_name_combined)
 
-DataViz_combined.plot_dataset(combined_df, ['acc_', 'gyr_', 'mag_', 'loc_', 'label'],
-                              ['like', 'like', 'like', 'like', 'like'], ['line', 'line', 'line', 'line', 'points'],
-                              dataset_name=dataset_name_combined)
+    DataViz_combined.plot_dataset(combined_df, ['acc_', 'gyr_', 'mag_', 'loc_', 'label'],
+                                  ['like', 'like', 'like', 'like', 'like'], ['line', 'line', 'line', 'line', 'points'],
+                                  dataset_name=dataset_name_combined)
 
-numerical_cols_combined = [col for col in combined_df.columns if 'label' not in col]
-DataViz_combined.plot_correlation_heatmap(combined_df, columns=numerical_cols_combined,
-                                          title=f"Correlation Heatmap for {dataset_name_combined} Dataset")
+    numerical_cols_combined = [col for col in combined_df.columns if 'label' not in col]
+    DataViz_combined.plot_correlation_heatmap(combined_df, columns=numerical_cols_combined,
+                                              title=f"Correlation Heatmap for {dataset_name_combined} Dataset")
+else:
+    print("\nNo files were found to combine.")
