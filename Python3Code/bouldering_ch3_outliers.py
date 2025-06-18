@@ -125,13 +125,22 @@ def main():
             print(f"Results saved to: {output_file}")
 
         elif FLAGS.mode == 'final':
-            for col in [c for c in dataset.columns if not 'label' in c]:
-                print(f'Applying Chauvenet to: {col}')
-                dataset = OutlierDistr.chauvenet(dataset, col, FLAGS.C)
-                dataset.loc[dataset[f'{col}_outlier'] == True, col] = np.nan
-                del dataset[col + '_outlier']
+            for col in [c for c in dataset.columns if 'label' not in c]:
+                print(f'Applying Local Outlier Factor (LOF) to: {col}')
+                try:
+                    dataset = OutlierDist.local_outlier_factor(dataset, [col], 'euclidean', FLAGS.K)
+                    # Identify outliers: a rule of thumb is to consider points with an LOF score > 1.5 as outliers.
+                    # You can adjust this threshold if needed.
+                    outlier_indices = dataset[dataset['lof'] > 1.5].index
+                    # Replace the identified outlier values in the original column with NaN.
+                    dataset.loc[outlier_indices, col] = np.nan
+                    del dataset['lof']
 
-            output_file = DATA_PATH / f'{base_output_name}'
+                except MemoryError as e:
+                    print(f'Not enough memory available for LOF on column {col}... Skipping.')
+
+            output_file_name = f'{base_output_name.replace(".csv", "")}_final_lof_K{FLAGS.K}.csv'
+            output_file = DATA_PATH / output_file_name
             dataset.to_csv(output_file)
             print(f"Final results for {input_file_path.name} saved to: {output_file}")
 
