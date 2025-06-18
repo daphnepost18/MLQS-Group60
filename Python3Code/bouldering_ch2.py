@@ -91,22 +91,22 @@ for dataset_folder_name_raw in os.listdir(ROOT_DATA_PATH):
         elif 'Hard' in dataset_name:
             dataset['labelHard'] = 1
 
-        DataViz.plot_dataset_boxplot(dataset, ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)'],
-                                    dataset_name=dataset_name)
-        DataViz.plot_dataset_boxplot(dataset, ["gyr_X (rad/s)", "gyr_Y (rad/s)", "gyr_Z (rad/s)"],
-                                    dataset_name=dataset_name)
-        DataViz.plot_dataset_boxplot(dataset, ["mag_X (µT)", "mag_Y (µT)", "mag_Z (µT)"],
-                                     dataset_name=dataset_name)
-        DataViz.plot_dataset_boxplot(dataset, ["loc_Height (m)", "loc_Velocity (m/s)"],
-                                     dataset_name=dataset_name)
+        # DataViz.plot_dataset_boxplot(dataset, ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)'],
+        #                             dataset_name=dataset_name)
+        # DataViz.plot_dataset_boxplot(dataset, ["gyr_X (rad/s)", "gyr_Y (rad/s)", "gyr_Z (rad/s)"],
+        #                             dataset_name=dataset_name)
+        # DataViz.plot_dataset_boxplot(dataset, ["mag_X (µT)", "mag_Y (µT)", "mag_Z (µT)"],
+        #                              dataset_name=dataset_name)
+        # DataViz.plot_dataset_boxplot(dataset, ["loc_Height (m)", "loc_Velocity (m/s)"],
+        #                              dataset_name=dataset_name)
 
         DataViz.plot_dataset(dataset, ['acc_', 'gyr_', 'mag_', 'loc_', 'label'],
                              ['like', 'like', 'like', 'like', 'like'], ['line', 'line', 'line', 'line', 'points'],
                              dataset_name=dataset_name)
 
         numerical_cols = [col for col in dataset.columns if 'label' not in col]
-        DataViz.plot_correlation_heatmap(dataset, columns=numerical_cols,
-                                         title=f"Correlation Heatmap for {dataset_name}")
+        # DataViz.plot_correlation_heatmap(dataset, columns=numerical_cols,
+        #                                  title=f"Correlation Heatmap for {dataset_name}")
 
         util.print_statistics(dataset)
         datasets_for_current_folder_granularities.append(copy.deepcopy(dataset))
