@@ -42,7 +42,7 @@ def grid_search_and_save_outputs():
         'n_estimators': [25, 50, 100],
         'max_depth': [1, 2, 3],
         'learning_rate': [0.01, 0.05, 0.1],
-        'random_state': [123]
+        'random_state': [1234]
     }
     
     model = xgb.XGBClassifier(use_label_encoder=False, eval_metric='logloss')
@@ -75,15 +75,32 @@ def grid_search_and_save_outputs():
     plt.savefig(f'{combined_file.stem}_confusion_matrix_{timestamp}.png')
     plt.close()
     
-    # Save feature importance plot
+    # Feature importance threshold
+    importance_threshold = 0.0001  # Only show features with importance above this threshold
+
+    # Extract feature importance and filter by threshold
+    importance = best_model.feature_importances_
+    feature_names = X.columns
+    important_features = [(feature, score) for feature, score in zip(feature_names, importance) if score > importance_threshold]
+
+    # Sort features by importance
+    important_features = sorted(important_features, key=lambda x: x[1], reverse=True)
+
+    # Prepare data for plotting
+    features = [f[0] for f in important_features]
+    scores = [f[1] for f in important_features]
+
+    # Plot filtered feature importance
     plt.figure(figsize=(12, 8))  # Increase figure size for better readability
-    ax = xgb.plot_importance(best_model, importance_type='weight', max_num_features=10)
-    plt.title('Feature Importance')
-
-    # Rotate y-axis labels for better readability
-    ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=10)
-
-    plt.savefig(f'{combined_file.stem}_feature_importance_{timestamp}.png')
+    plt.barh(features, scores, color='skyblue')
+    plt.xlabel('Importance Score', fontsize=12)
+    plt.ylabel('Features', fontsize=12)
+    plt.title(f'Feature Importance (Threshold > {importance_threshold})', fontsize=14)
+    plt.gca().invert_yaxis()  # Invert y-axis to show the most important feature at the top
+    plt.xticks(fontsize=10)
+    plt.yticks(fontsize=10)
+    plt.tight_layout()  # Adjust layout to prevent cutting off labels
+    plt.savefig(f'{combined_file.stem}_filtered_feature_importance_{timestamp}.png')
     plt.close()
     
     # Save classification report, accuracy, and F1 score to a text file
