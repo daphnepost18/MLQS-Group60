@@ -1,86 +1,105 @@
-import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 import xgboost as xgb
+import pandas as pd
+from pathlib import Path
+import time
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix
 
-# Load the dataset
-dataset_path = "./intermediate_datafiles_bouldering/chapter5_result_combined.csv"
-data = pd.read_csv(dataset_path)
+def main():
+    start_time = time.time()
+    DATA_PATH = Path('./intermediate_datafiles_bouldering/')
+    
+    # Ensure only the combined file is used
+    combined_file = DATA_PATH / 'chapter5_result_combined.csv'
+    if combined_file.exists():
+        input_files = [combined_file]
+        print("Mode: Processing only the combined chapter 5 final result file...")
+        print(f"Combined file found: {combined_file.name}")
+    else:
+        print(f"Combined file not found at '{combined_file}'. Please run bouldering_ch5.py with '--mode final' and '--source combined'.")
+        return
 
-# Drop invalid columns (e.g., 'Unnamed: 0')
-data = data.drop(columns=["Unnamed: 0"], errors="ignore")
+    for input_file_path in input_files:
+        print(f"\n\n======================================================")
+        print(f"--- Processing file: {input_file_path.name} ---")
+        print(f"======================================================\n")
 
-# Assign a name to the first column (timestamp) for clarity
-data.rename(columns={data.columns[0]: "timestamp"}, inplace=True)
+        # Load the dataset
+        data = pd.read_csv(input_file_path)
 
-# Separate instances based on consecutive one-hot labels and timestamps
-data["instance_id"] = (data[["labelEasy", "labelMedium", "labelHard"]]
-                       .idxmax(axis=1)  # Get the label column name
-                       .ne(data[["labelEasy", "labelMedium", "labelHard"]]
-                           .idxmax(axis=1).shift())  # Compare with previous row
-                       .cumsum())  # Create unique instance IDs
+        # Preprocess the dataset
+        # Drop unnecessary columns
+        if 'Unnamed: 0' in data.columns:
+            data = data.drop(columns=['Unnamed: 0'])
 
-# Print the instance IDs for verification
-print("Instance IDs:")
-print(data["instance_id"].unique())  # Print unique instance IDs
+        # Define target columns and expected classes
+        target_columns = ['labelEasy', 'labelMedium', 'labelHard']
+        expected_classes = ['labelEasy', 'labelMedium', 'labelHard']
 
-# Verify instance separation using the renamed timestamp column
-data = data.sort_values(by=["instance_id", "timestamp"])
+        # Combine target columns into a single target variable
+        y = data[target_columns].idxmax(axis=1)  # Assumes one-hot encoding for target columns
+        print(f"Unique classes in y before filtering: {y.unique()}")
 
-# Aggregate features for each instance (e.g., calculate mean, max, min, etc.)
-grouped_data = data.groupby("instance_id")
-aggregated_features = grouped_data.agg(["mean", "max", "min"]).reset_index()
+        # Filter valid classes
+        y = y[y.isin(expected_classes)]
+        X = data.drop(columns=target_columns)  # Drop target columns from features
+        X = X.loc[y.index]  # Ensure X matches the filtered y
 
-# Flatten multi-level columns created by aggregation
-aggregated_features.columns = [
-    f"{col[0]}_{col[1]}" if col[1] else col[0] for col in aggregated_features.columns
-]
+        # Select valid feature columns (numeric and categorical)
+        X = X.select_dtypes(include=['int', 'float', 'bool', 'category'])
 
-# Extract labels for each instance (assuming labels are consistent within each group)
-aggregated_labels = grouped_data[["labelEasy", "labelMedium", "labelHard"]].first()
+        print(f"Unique classes in y after filtering: {y.unique()}")
+        print(f"Number of samples after filtering: {len(y)}")
 
-# Combine labels into a single column for stratified sampling
-labels_combined = aggregated_labels.idxmax(axis=1)  # Assumes one-hot encoding
+        # Encode target labels
+        from sklearn.preprocessing import LabelEncoder
+        label_encoder = LabelEncoder()
+        y = label_encoder.fit_transform(y)
+        print(f"Label encoding: {dict(zip(label_encoder.classes_, label_encoder.transform(label_encoder.classes_)))}")
 
-# Map string labels to numeric values
-label_mapping = {"labelEasy": 0, "labelMedium": 1, "labelHard": 2}
-labels_combined = labels_combined.map(label_mapping)
+        # Split the data into training and testing sets
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Ensure all feature columns are numeric
-aggregated_features = aggregated_features.apply(pd.to_numeric, errors="coerce").fillna(0)
+        # Train an XGBoost classifier
+        model = xgb.XGBClassifier(use_label_encoder=False, eval_metric='logloss')
+        model.fit(X_train, y_train)
 
-# Verify the number of instances
-print("Total number of instances:", aggregated_features.shape[0])
+        # Evaluate the model
+        accuracy = model.score(X_test, y_test)
+        print(f"Accuracy for file {input_file_path.name}: {accuracy:.2f}")
 
-# Add instance IDs back to the features for tracking
-aggregated_features["instance_id"] = grouped_data["instance_id"].first().values
+        # Confusion Matrix
+        cm = confusion_matrix(y_test, model.predict(X_test))
+        report = classification_report(y_test, model.predict(X_test), target_names=label_encoder.classes_)
+        print(f'Confusion Matrix:\n{cm}')
+        print(f'Classification Report:\n{report}')
 
-# Split the dataset into balanced train-test sets
-X_train, X_test, y_train, y_test = train_test_split(
-    aggregated_features, labels_combined, test_size=0.2, stratify=labels_combined, random_state=123
-)
+        # Plot and save confusion matrix
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=expected_classes, yticklabels=expected_classes)
+        plt.title('Confusion Matrix')
+        plt.xlabel('Predicted')
+        plt.ylabel('Actual')
+        plt.savefig(f'{input_file_path.stem}_confusion_matrix.png')
+        plt.close()
 
-# Print instance IDs and labels used for testing
-print("Instance IDs and labels used for testing:")
-test_instances = X_test[["instance_id"]].copy()
-test_instances["label"] = y_test.values
-print(test_instances)
+        # Feature Importance
+        plt.figure(figsize=(10, 6))
+        importance = model.feature_importances_
+        plt.bar(range(len(importance)), importance)
+        plt.xticks(range(len(importance)), X.columns, rotation=90)
+        plt.title('Feature Importance')
+        plt.xlabel('Features')
+        plt.ylabel('Importance')
+        plt.tight_layout()
+        plt.savefig(f'{input_file_path.stem}_feature_importance.png')
+        plt.close()
 
-# Train an XGBoost model
-xgb_model = xgb.XGBClassifier()
-xgb_model.fit(X_train.drop(columns=["instance_id"]), y_train)  # Drop instance_id for training
+    print(f"Total processing time: {time.time() - start_time:.2f} seconds")
 
-# Evaluate the model
-y_pred = xgb_model.predict(X_test.drop(columns=["instance_id"]))  # Drop instance_id for testing
 
-# Calculate metrics
-accuracy = accuracy_score(y_test, y_pred)
-conf_matrix = confusion_matrix(y_test, y_pred)
-class_report = classification_report(y_test, y_pred)
-
-# Print metrics
-print(f"Model Accuracy: {accuracy}")
-print("Confusion Matrix:")
-print(conf_matrix)
-print("Classification Report:")
-print(class_report)
+if __name__ == "__main__":
+    main()
