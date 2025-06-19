@@ -8,6 +8,10 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import time
+import seaborn as sns
 
 def lstm_classification():
     DATA_PATH = Path('./intermediate_datafiles_bouldering/')
@@ -99,10 +103,15 @@ def lstm_classification():
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-    # Training loop
-    epochs = 50
+    # Initialize lists to store training loss for plotting
+    loss_history = []
+
+    # Training loop with early stopping
+    epochs = 100
+    delta_threshold = 0.0001  # Define the threshold for delta loss
+    previous_loss = float('inf')  # Initialize previous loss to infinity
     print("Training the model...")
-    #TODO stop training after delta-loss < ..
+
     for epoch in tqdm(range(1, epochs + 1), desc="Epoch Progress"):
         model.train()
         train_loss = 0.0
@@ -120,8 +129,17 @@ def lstm_classification():
 
         train_loss /= len(train_loader)
         train_accuracy /= len(train_dataset)
+        loss_history.append(train_loss)  # Store loss for plotting
 
         print(f"Epoch {epoch}/{epochs} - Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}")
+
+        # Early stopping condition
+        delta_loss = abs(previous_loss - train_loss)
+        if delta_loss < delta_threshold:
+            print(f"Stopping early at epoch {epoch} as delta loss ({delta_loss:.6f}) is below the threshold ({delta_threshold})")
+            break
+
+        previous_loss = train_loss  # Update previous loss for the next epoch
 
     # Evaluate the model
     model.eval()
@@ -130,7 +148,33 @@ def lstm_classification():
         test_accuracy = (outputs.argmax(dim=1) == y_test_tensor.argmax(dim=1)).sum().item() / len(y_test_tensor)
         print(f"Test Accuracy: {test_accuracy:.2f}")
 
-    #TODO plots of train loss, predictions, etc.
+        # Generate confusion matrix
+        y_pred = outputs.argmax(dim=1).cpu().numpy()
+        y_true = y_test_tensor.argmax(dim=1).cpu().numpy()
+        cm = confusion_matrix(y_true, y_pred)
+
+        # Save confusion matrix plot with timestamp
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=expected_classes, yticklabels=expected_classes)
+        plt.title(f"Confusion Matrix - {timestamp}")
+        plt.xlabel("Predicted Labels")
+        plt.ylabel("True Labels")
+        plt.savefig(f"confusion_matrix_{timestamp}.png")
+        plt.close()
+
+    # Plot training loss
+    #TODO decide if we want to have accuracy in same plot?
+    plt.plot(range(1, len(loss_history) + 1), loss_history, label="Train Loss")
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.title(f"Training Loss - {timestamp}")
+    plt.legend()
+    plt.savefig(f"training_loss_{timestamp}.png")
+    plt.close()
+
+    print(f"Plots saved with timestamp {timestamp}.")
+
 
 if __name__ == "__main__":
     print("Starting LSTM classification...")
