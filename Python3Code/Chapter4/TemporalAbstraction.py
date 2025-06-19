@@ -69,12 +69,20 @@ class NumericalAbstraction:
 
 # Class to perform categorical abstraction. We obtain patterns of categorical attributes that occur frequently
 # over time.
+# Class to perform categorical abstraction. We obtain patterns of categorical attributes that occur frequently
+# over time.
 class CategoricalAbstraction:
-
     pattern_prefix = 'temp_pattern_'
     before = '(b)'
     co_occurs = '(c)'
-    cache = {}
+
+    # The cache is no longer a class attribute.
+
+    def __init__(self):
+        """
+        Initializes the abstraction object with its own, empty cache for each instance.
+        """
+        self.cache = {}
 
     # Determine the time points a pattern occurs in the dataset given a windows size.
     def determine_pattern_times(self, data_table, pattern, window_size):
@@ -87,9 +95,9 @@ class CategoricalAbstraction:
                 times = self.cache[self.to_string(pattern)]
             # Otherwise we identify the time points at which we observe the value.
             else:
-               
+
                 timestamp_rows = data_table[data_table[pattern[0]] > 0].index.values.tolist()
-               
+
                 times = [data_table.index.get_loc(i) for i in timestamp_rows]
                 self.cache[self.to_string(pattern)] = times
 
@@ -135,7 +143,7 @@ class CategoricalAbstraction:
             # Determine the times at which the pattern occurs.
             times = self.determine_pattern_times(data_table, pattern, window_size)
             # Compute the support
-            support = float(len(times))/len(data_table.index)
+            support = float(len(times)) / len(data_table.index)
             # If we meet the minimum support, append the selected patterns and set the
             # value to 1 at which it occurs.
             if support >= min_support:
@@ -143,10 +151,9 @@ class CategoricalAbstraction:
                 print(self.to_string(pattern))
                 # Set the occurrence of the pattern in the row to 0.
                 data_table[self.pattern_prefix + self.to_string(pattern)] = 0
-                #data_table[self.pattern_prefix + self.to_string(pattern)][times] = 1
+                # data_table[self.pattern_prefix + self.to_string(pattern)][times] = 1
                 data_table.iloc[times, data_table.columns.get_loc(self.pattern_prefix + self.to_string(pattern))] = 1
         return data_table, selected_patterns
-
 
     # extends a set of k-patterns with the 1-patterns that have sufficient support.
     def extend_k_patterns(self, k_patterns, one_patterns):
@@ -158,7 +165,6 @@ class CategoricalAbstraction:
                 # Add a co-occurs relationship.
                 new_patterns.append([k_p, self.co_occurs, one_p])
         return new_patterns
-
 
     # Function to abstract our categorical data. Note that we assume a list of binary columns representing
     # the different categories. We set whether the column names should match exactly 'exact' or should include the
@@ -180,7 +186,8 @@ class CategoricalAbstraction:
         # Generate the one patterns first
         potential_1_patterns = [[pattern] for pattern in relevant_dataset_cols]
 
-        new_data_table, one_patterns = self.select_k_patterns(data_table, potential_1_patterns, min_support, window_size)
+        new_data_table, one_patterns = self.select_k_patterns(data_table, potential_1_patterns, min_support,
+                                                              window_size)
         selected_patterns.extend(one_patterns)
         print(f'Number of patterns of size 1 is {len(one_patterns)}')
 
@@ -191,11 +198,9 @@ class CategoricalAbstraction:
         while (k < max_pattern_size) & (len(k_patterns) > 0):
             k = k + 1
             potential_k_patterns = self.extend_k_patterns(k_patterns, one_patterns)
-            new_data_table, selected_new_k_patterns = self.select_k_patterns(new_data_table, potential_k_patterns, min_support, window_size)
+            new_data_table, selected_new_k_patterns = self.select_k_patterns(new_data_table, potential_k_patterns,
+                                                                             min_support, window_size)
             selected_patterns.extend(selected_new_k_patterns)
             print(f'Number of patterns of size {k} is {len(selected_new_k_patterns)}')
 
         return new_data_table
-
-
-

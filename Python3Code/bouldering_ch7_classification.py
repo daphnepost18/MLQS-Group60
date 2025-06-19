@@ -1,216 +1,272 @@
+##############################################################
+#                                                            #
+#    Mark Hoogendoorn and Burkhardt Funk (2017)              #
+#    Machine Learning for the Quantified Self                #
+#    Springer                                                #
+#    Chapter 7 - Adapted for Bouldering Dataset              #
+#                                                            #
+##############################################################
+
 import os
-import re
+import copy
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+import time
+import argparse
 
+from sklearn.model_selection import train_test_split
+
+from Chapter7.PrepareDatasetForLearning import PrepareDatasetForLearning
 from Chapter7.LearningAlgorithms import ClassificationAlgorithms
 from Chapter7.Evaluation import ClassificationEvaluation
-from util.VisualizeDataset import VisualizeDataset
+from Chapter7.FeatureSelection import FeatureSelectionClassification
 from util import util
-
-def extract_difficulty_from_filename(filename):
-    """Extracts 'Easy', 'Medium', or 'Hard' from a filename."""
-    match = re.search(r'_(Easy|Medium|Hard)', filename)
-    if match:
-        return match.group(1)
-    return None
-
-
-def aggregate_session_features(df):
-    """
-    Aggregates time-series data from a session into a single feature row.
-    """
-    # Select only numeric columns for aggregation
-    numeric_df = df.select_dtypes(include=np.number)
-
-    # Exclude any label or class columns that might be present
-    numeric_df = numeric_df.loc[:, ~numeric_df.columns.str.startswith('label')]
-    if 'class' in numeric_df.columns:
-        numeric_df = numeric_df.drop(columns=['class'])
-
-    # Perform aggregation. This results in a DataFrame.
-    agg_df = numeric_df.agg(['mean', 'std', 'min', 'max'])
-
-    # Check if aggregation result is empty
-    if agg_df.empty:
-        return pd.DataFrame()
-
-    # Unstack the DataFrame to create a MultiIndex Series. This is the key step.
-    s = agg_df.unstack()
-
-    # Create new, flattened column names by joining the levels of the MultiIndex.
-    s.index = s.index.map(lambda x: f"{x[0]}_{x[1]}")
-
-    # Convert the final Series to a single-row DataFrame and return.
-    return s.to_frame().T
+from util.VisualizeDataset import VisualizeDataset
 
 
 def main():
+    start_time = time.time()
     DATA_PATH = Path('./intermediate_datafiles_bouldering/')
 
-    # --- 1. Select Training and Test Files ---
+    USE_ALL_FILES = (FLAGS.source == 'all')
 
-    all_files = list(DATA_PATH.glob('chapter5_result_*.csv'))
+    if USE_ALL_FILES:
+        print("Mode: Processing all individual chapter 5 final result files...")
+        all_chapter5_files = list(DATA_PATH.glob('chapter5_result_*.csv'))
+        input_files = [f for f in all_chapter5_files if 'combined' not in f.name]
+    else:
+        print("Mode: Processing only the combined chapter 5 final result file...")
+        combined_file = DATA_PATH / 'chapter5_result_combined.csv'
+        if combined_file.exists():
+            input_files = [combined_file]
+        else:
+            input_files = []
 
-    # Hardcode the test files as requested
-    test_filenames = [
-        'chapter5_result_participant1_Easy2_250.csv',
-        'chapter5_result_participant1_Medium3_250.csv',
-        'chapter5_result_participant1_Hard1_250.csv'  # Typo from previous version corrected
-    ]
-    test_files = [p for p in all_files if p.name in test_filenames]
-
-    # Select training files, excluding the test files
-    train_files_all = [f for f in all_files if f not in test_files]
-
-    # Select the specified number of files for each difficulty for training
-    train_files_selected = []
-    difficulties = {'Easy': 3, 'Medium': 4, 'Hard': 4}
-    for diff, count in difficulties.items():
-        diff_files = [f for f in train_files_all if extract_difficulty_from_filename(f.name) == diff]
-        train_files_selected.extend(diff_files[:count])
-
-    print(f"Found {len(train_files_selected)} training files and {len(test_files)} test files.")
-    if len(train_files_selected) == 0 or len(test_files) != 3:
-        print("Could not find enough files for training/testing. Please check file paths and names.")
+    if not input_files:
+        if USE_ALL_FILES:
+            print(
+                "No individual Chapter 5 final result files found. Please run bouldering_ch5.py with '--mode final' first.")
+        else:
+            print(
+                f"Combined file not found at '{combined_file}'. Please run bouldering_ch5.py with '--mode final' and '--source combined'.")
         return
 
-    # --- 2. Create Aggregated Training and Test Sets ---
+    N_FORWARD_SELECTION = 30
 
-    train_rows = []
-    train_labels = []
-    for file_path in train_files_selected:
+    for input_file_path in input_files:
+        print(f"\n\n======================================================")
+        print(f"--- Processing file: {input_file_path.name} ---")
+        print(f"======================================================\n")
+
         try:
-            session_df = pd.read_csv(file_path, index_col=0)
-            if not session_df.empty:
-                agg_row = aggregate_session_features(session_df)
-                if not agg_row.empty:
-                    train_rows.append(agg_row)
-                    train_labels.append(extract_difficulty_from_filename(file_path.name))
-        except Exception as e:
-            print(f"Could not process file {file_path.name}: {e}")
+            dataset = pd.read_csv(input_file_path, index_col=0)
+            dataset.index = pd.to_datetime(dataset.index)
+        except IOError as e:
+            print(f'File not found: {input_file_path.name}. Skipping.')
+            continue
 
-    test_rows = []
-    test_labels = []
-    for file_path in test_files:
-        try:
-            session_df = pd.read_csv(file_path, index_col=0)
-            if not session_df.empty:
-                agg_row = aggregate_session_features(session_df)
-                if not agg_row.empty:
-                    test_rows.append(agg_row)
-                    test_labels.append(extract_difficulty_from_filename(file_path.name))
-        except Exception as e:
-            print(f"Could not process file {file_path.name}: {e}")
+        dataset_name = input_file_path.stem.replace('chapter5_result_', '')
+        EXPORT_TREE_PATH = Path(f'./figures/bouldering_ch7_classification/')
+        EXPORT_TREE_PATH.mkdir(exist_ok=True, parents=True)
 
-    if not train_rows or not test_rows:
-        print("Failed to create training/test sets. The datasets may be empty after filtering.")
-        return
+        DataViz = VisualizeDataset(__file__)
+        prepare = PrepareDatasetForLearning()
 
-    train_X = pd.concat(train_rows, ignore_index=True)
-    train_y = pd.Series(train_labels, name="difficulty")
+        train_X, test_X, train_y, test_y = prepare.split_single_dataset_classification(dataset, ['label'], 'like', 0.8,
+                                                                                       filter=True, temporal=False)
 
-    test_X = pd.concat(test_rows, ignore_index=True)
-    test_y = pd.Series(test_labels, name="difficulty")
+        print('Training set length is: ', len(train_X.index))
+        print('Test set length is: ', len(test_X.index))
 
-    # Align columns - crucial if some files have different columns
-    train_cols = train_X.columns
-    test_cols = test_X.columns
-    shared_cols = list(set(train_cols) & set(test_cols))
+        basic_features = [c for c in train_X.columns if
+                          c.startswith('acc_') or c.startswith('gyr_') or c.startswith('mag_') or c.startswith('loc_')]
+        pca_features = [c for c in train_X.columns if c.startswith('pca_')]
+        time_features = [c for c in train_X.columns if '_temp_' in c]
+        freq_features = [c for c in train_X.columns if '_freq' in c or '_pse' in c]
+        cluster_features = [c for c in train_X.columns if c.startswith('cluster')]
 
-    train_X = train_X[shared_cols]
-    test_X = test_X[shared_cols]
+        print(f'#basic features: {len(basic_features)}')
+        print(f'#PCA features: {len(pca_features)}')
+        print(f'#time features: {len(time_features)}')
+        print(f'#frequency features: {len(freq_features)}')
+        print(f'#cluster features: {len(cluster_features)}')
 
-    # Impute NaN values that may result from std of a single point, etc.
-    train_X = train_X.fillna(train_X.mean())
-    test_X = test_X.fillna(train_X.mean())  # Use training mean for test set
+        features_after_chapter_3 = list(set(basic_features + pca_features))
+        features_after_chapter_4 = list(set(features_after_chapter_3 + time_features + freq_features))
+        features_after_chapter_5 = list(set(features_after_chapter_4 + cluster_features))
 
-    print("\n--- Created Aggregated Datasets ---")
-    print(f"Training set shape: {train_X.shape}")
-    print(f"Test set shape: {test_X.shape}")
-    print(f"Training labels distribution:\n{train_y.value_counts()}")
+        print("\nRunning Forward Feature Selection...")
+        fs = FeatureSelectionClassification()
 
-    # --- 3. Scale Features ---
-    scaler = StandardScaler()
-    train_X_scaled = pd.DataFrame(scaler.fit_transform(train_X), columns=train_X.columns)
-    test_X_scaled = pd.DataFrame(scaler.transform(test_X), columns=test_X.columns)
+        features, ordered_features, ordered_scores = fs.forward_selection(
+            N_FORWARD_SELECTION, train_X[features_after_chapter_5], test_X[features_after_chapter_5],
+            train_y, test_y, gridsearch=False
+        )
 
-    # --- 4. Train and Evaluate Models ---
+        DataViz.plot_xy(x=[range(1, N_FORWARD_SELECTION + 1)], y=[ordered_scores],
+                        xlabel='number of features', ylabel='accuracy', dataset_name=dataset_name,
+                        methodch3='f_selection')
 
-    learner = ClassificationAlgorithms()
-    eval = ClassificationEvaluation()
-    DataViz = VisualizeDataset(__file__)
+        selected_features = ordered_features[:10]
+        print(f"\nTop 10 selected features for {dataset_name}: {selected_features}")
 
-    N_KCV_REPEATS = 3
+        learner = ClassificationAlgorithms()
+        eval = ClassificationEvaluation()
 
-    print("\n--- Comparing Classification Algorithms ---")
+        print("\nStudying impact of regularization and model complexity...")
 
-    # Non-deterministic classifiers
-    perf_tr_nn, perf_te_nn = 0, 0
-    perf_tr_rf, perf_te_rf = 0, 0
-    for i in range(N_KCV_REPEATS):
-        print(f"Training Non-Deterministic Run {i + 1}/{N_KCV_REPEATS}...")
-        class_train_y, class_test_y, _, _ = learner.feedforward_neural_network(
-            train_X_scaled, train_y, test_X_scaled, gridsearch=True)
-        perf_tr_nn += eval.accuracy(train_y, class_train_y)
-        perf_te_nn += eval.accuracy(test_y, class_test_y)
+        reg_parameters = [0.0001, 0.001, 0.01, 0.1, 1, 10]
+        performance_training_nn = []
+        performance_test_nn = []
+        N_REPEATS_NN = 3
 
-        class_train_y, class_test_y, _, _ = learner.random_forest(
-            train_X_scaled, train_y, test_X_scaled, gridsearch=True)
-        perf_tr_rf += eval.accuracy(train_y, class_train_y)
-        perf_te_rf += eval.accuracy(test_y, class_test_y)
+        for reg_param in reg_parameters:
+            performance_tr = 0
+            performance_te = 0
+            for i in range(N_REPEATS_NN):
+                class_train_y, class_test_y, _, _ = learner.feedforward_neural_network(
+                    train_X, train_y,
+                    test_X, hidden_layer_sizes=(250,), alpha=reg_param, max_iter=500,
+                    gridsearch=False
+                )
+                performance_tr += eval.accuracy(train_y, class_train_y)
+                performance_te += eval.accuracy(test_y, class_test_y)
+            performance_training_nn.append(performance_tr / N_REPEATS_NN)
+            performance_test_nn.append(performance_te / N_REPEATS_NN)
 
-    # Deterministic classifiers
-    print("Training Deterministic Classifiers...")
-    class_train_y, class_test_y, _, _ = learner.support_vector_machine_with_kernel(
-        train_X_scaled, train_y, test_X_scaled, gridsearch=True)
-    perf_tr_svm = eval.accuracy(train_y, class_train_y)
-    perf_te_svm = eval.accuracy(test_y, class_test_y)
+        DataViz.plot_xy(x=[reg_parameters, reg_parameters], y=[performance_training_nn, performance_test_nn],
+                        method='semilogx', xlabel='regularization parameter value', ylabel='accuracy',
+                        names=['training', 'test'], line_styles=['r-', 'b:'], dataset_name=dataset_name,
+                        methodch3='regularization')
 
-    class_train_y, class_test_y, _, _ = learner.k_nearest_neighbor(
-        train_X_scaled, train_y, test_X_scaled, gridsearch=True)
-    perf_tr_knn = eval.accuracy(train_y, class_train_y)
-    perf_te_knn = eval.accuracy(test_y, class_test_y)
+        leaf_settings = [1, 2, 5, 10]
+        performance_training_dt = []
+        performance_test_dt = []
 
-    class_train_y, class_test_y, _, _ = learner.decision_tree(
-        train_X_scaled, train_y, test_X_scaled, gridsearch=True)
-    perf_tr_dt = eval.accuracy(train_y, class_train_y)
-    perf_te_dt = eval.accuracy(test_y, class_test_y)
+        for no_points_leaf in leaf_settings:
+            class_train_y, class_test_y, _, _ = learner.decision_tree(
+                train_X[selected_features], train_y, test_X[selected_features], min_samples_leaf=no_points_leaf,
+                gridsearch=False, print_model_details=False)
+            performance_training_dt.append(eval.accuracy(train_y, class_train_y))
+            performance_test_dt.append(eval.accuracy(test_y, class_test_y))
 
-    class_train_y, class_test_y, class_prob_tr_nb, class_prob_te_nb = learner.naive_bayes(
-        train_X_scaled, train_y, test_X_scaled)
-    perf_tr_nb = eval.accuracy(train_y, class_train_y)
-    perf_te_nb = eval.accuracy(test_y, class_test_y)
+        DataViz.plot_xy(x=[leaf_settings, leaf_settings], y=[performance_training_dt, performance_test_dt],
+                        xlabel='minimum number of points per leaf', ylabel='accuracy',
+                        names=['training', 'test'], line_styles=['r-', 'b:'], dataset_name=dataset_name,
+                        methodch3='leaf_settings')
 
-    scores = util.print_table_row_performances(
-        'Aggregated Features', len(train_X), len(test_X),
-        [
-            (perf_tr_nn / N_KCV_REPEATS, perf_te_nn / N_KCV_REPEATS),
-            (perf_tr_rf / N_KCV_REPEATS, perf_te_rf / N_KCV_REPEATS),
-            (perf_tr_svm, perf_te_svm),
-            (perf_tr_knn, perf_te_knn),
-            (perf_tr_dt, perf_te_dt),
-            (perf_tr_nb, perf_te_nb)
-        ]
-    )
+        possible_feature_sets = [basic_features, features_after_chapter_3, features_after_chapter_4,
+                                 features_after_chapter_5, selected_features]
+        feature_names = ['Initial Set', 'Chapter 3', 'Chapter 4', 'Chapter 5', 'Selected Features']
+        N_KCV_REPEATS = 5
 
-    DataViz.plot_performances_classification(
-        ['NN', 'RF', 'SVM', 'KNN', 'DT', 'NB'],
-        ['Aggregated Features'],
-        [scores]
-    )
+        print(f"\n--- Starting main classification loop for {dataset_name} ---")
+        scores_over_all_algs = []
 
-    # --- 5. Detailed Look at Best Model ---
+        for i in range(len(possible_feature_sets)):
+            current_features = possible_feature_sets[i]
+            if not current_features or not all(f in train_X.columns for f in current_features):
+                print(f"Skipping feature set '{feature_names[i]}' as it contains missing or no features.")
+                scores_over_all_algs.append([(0, 0)] * 6)  # 6 algorithms
+                continue
 
-    print("\n--- Detailed Analysis of Best Performing Model ---")
+            selected_train_X = train_X[current_features]
+            selected_test_X = test_X[current_features]
 
-    # We'll use the results from the Naive Bayes model as it's often a good baseline
-    # and provides the probabilities needed for the confusion matrix.
-    test_cm = eval.confusion_matrix(test_y, class_test_y, class_prob_te_nb.columns)
-    DataViz.plot_confusion_matrix(test_cm, class_prob_te_nb.columns, normalize=False)
+            performance_tr_nn, performance_te_nn = (0, 0)
+            performance_tr_rf, performance_te_rf = (0, 0)
+            performance_tr_svm, performance_te_svm = (0, 0)
+            last_pred_nn, last_prob_nn = (None, None)
+            last_pred_rf, last_prob_rf = (None, None)
+            last_pred_svm, last_prob_svm = (None, None)
+
+            for repeat in range(N_KCV_REPEATS):
+                print(f"\nRun {repeat + 1}/{N_KCV_REPEATS} for feature set: '{feature_names[i]}'")
+                print("Training NeuralNetwork...")
+                c_train_y, c_test_y, c_train_p, _ = learner.feedforward_neural_network(selected_train_X, train_y,
+                                                                                       selected_test_X, gridsearch=True)
+                performance_tr_nn += eval.accuracy(train_y, c_train_y)
+                performance_te_nn += eval.accuracy(test_y, c_test_y)
+                if repeat == N_KCV_REPEATS - 1: last_pred_nn, last_prob_nn = c_test_y, c_train_p
+                print("Training RandomForest...")
+                c_train_y, c_test_y, c_train_p, _ = learner.random_forest(selected_train_X, train_y, selected_test_X,
+                                                                          gridsearch=True)
+                performance_tr_rf += eval.accuracy(train_y, c_train_y)
+                performance_te_rf += eval.accuracy(test_y, c_test_y)
+                if repeat == N_KCV_REPEATS - 1: last_pred_rf, last_prob_rf = c_test_y, c_train_p
+                print("Training SVM...")
+                c_train_y, c_test_y, c_train_p, _ = learner.support_vector_machine_with_kernel(selected_train_X,
+                                                                                               train_y, selected_test_X,
+                                                                                               gridsearch=True)
+                performance_tr_svm += eval.accuracy(train_y, c_train_y)
+                performance_te_svm += eval.accuracy(test_y, c_test_y)
+                if repeat == N_KCV_REPEATS - 1: last_pred_svm, last_prob_svm = c_test_y, c_train_p
+
+            performance_tr_nn /= N_KCV_REPEATS
+            performance_te_nn /= N_KCV_REPEATS
+            performance_tr_rf /= N_KCV_REPEATS
+            performance_te_rf /= N_KCV_REPEATS
+            performance_tr_svm /= N_KCV_REPEATS
+            performance_te_svm /= N_KCV_REPEATS
+
+            print("\nGenerating confusion matrices for non-deterministic models...")
+            cm_nn = eval.confusion_matrix(test_y, last_pred_nn, last_prob_nn.columns)
+            DataViz.plot_confusion_matrix(cm_nn, last_prob_nn.columns, normalize=False, dataset_name=dataset_name,
+                                          method=f'{feature_names[i]}_NN')
+            cm_rf = eval.confusion_matrix(test_y, last_pred_rf, last_prob_rf.columns)
+            DataViz.plot_confusion_matrix(cm_rf, last_prob_rf.columns, normalize=False, dataset_name=dataset_name,
+                                          method=f'{feature_names[i]}_RF')
+            cm_svm = eval.confusion_matrix(test_y, last_pred_svm, last_prob_svm.columns)
+            DataViz.plot_confusion_matrix(cm_svm, last_prob_svm.columns, normalize=False, dataset_name=dataset_name,
+                                          method=f'{feature_names[i]}_SVM')
+
+            print("\nTraining Deterministic Classifiers...")
+            print(f"Featureset: {feature_names[i]}")
+            print("Training K-Nearest Neighbor...")
+            c_train_y_knn, c_test_y_knn, c_train_p_knn, _ = learner.k_nearest_neighbor(selected_train_X, train_y,
+                                                                                       selected_test_X, gridsearch=True)
+            performance_tr_knn = eval.accuracy(train_y, c_train_y_knn)
+            performance_te_knn = eval.accuracy(test_y, c_test_y_knn)
+            cm_knn = eval.confusion_matrix(test_y, c_test_y_knn, c_train_p_knn.columns)
+            DataViz.plot_confusion_matrix(cm_knn, c_train_p_knn.columns, normalize=False, dataset_name=dataset_name,
+                                          method=f'{feature_names[i]}_KNN')
+            print("Training Decision Tree...")
+            c_train_y_dt, c_test_y_dt, c_train_p_dt, _ = learner.decision_tree(selected_train_X, train_y,
+                                                                               selected_test_X, gridsearch=True)
+            performance_tr_dt = eval.accuracy(train_y, c_train_y_dt)
+            performance_te_dt = eval.accuracy(test_y, c_test_y_dt)
+            cm_dt = eval.confusion_matrix(test_y, c_test_y_dt, c_train_p_dt.columns)
+            DataViz.plot_confusion_matrix(cm_dt, c_train_p_dt.columns, normalize=False, dataset_name=dataset_name,
+                                          method=f'{feature_names[i]}_DT')
+            print("Training Naive Bayes...")
+            c_train_y_nb, c_test_y_nb, c_train_p_nb, _ = learner.naive_bayes(selected_train_X, train_y, selected_test_X)
+            performance_tr_nb = eval.accuracy(train_y, c_train_y_nb)
+            performance_te_nb = eval.accuracy(test_y, c_test_y_nb)
+            cm_nb = eval.confusion_matrix(test_y, c_test_y_nb, c_train_p_nb.columns)
+            DataViz.plot_confusion_matrix(cm_nb, c_train_p_nb.columns, normalize=False, dataset_name=dataset_name,
+                                          method=f'{feature_names[i]}_NB')
+
+            scores_with_sd = util.print_table_row_performances(
+                feature_names[i], len(selected_train_X.index), len(selected_test_X.index),
+                [(performance_tr_nn, performance_te_nn), (performance_tr_rf, performance_te_rf),
+                 (performance_tr_svm, performance_te_svm),
+                 (performance_tr_knn, performance_te_knn), (performance_tr_dt, performance_te_dt),
+                 (performance_tr_nb, performance_te_nb)]
+            )
+            scores_over_all_algs.append(scores_with_sd)
+
+        DataViz.plot_performances_classification(['NN', 'RF', 'SVM', 'KNN', 'DT', 'NB'], feature_names,
+                                                 scores_over_all_algs, dataset_name)
+
+    print(f"\nTotal processing time: {time.time() - start_time} seconds")
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--source', type=str, default='combined',
+                        help="Specify source: 'all' for individual files, or 'combined' for the single combined file.",
+                        choices=['all', 'combined'])
+    FLAGS, unparsed = parser.parse_known_args()
     main()

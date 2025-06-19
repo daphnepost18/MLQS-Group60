@@ -41,34 +41,26 @@ class VisualizeDataset:
         print(f'Figure saved to {save_path}')
         self.plot_number += 1
 
-    def plot_dataset_boxplot(self, dataset, cols, participant_name=None, dataset_name=None):
+    def plot_dataset_boxplot(self, dataset, cols, dataset_name=None):
         # FIX: Changed plt.Figure() to plt.figure() to ensure a new figure is created for each plot.
         plt.figure()
         dataset[cols].plot.box()
 
         title_str = ""
-        if participant_name and dataset_name:
-            title_str = f"Boxplot for Participant: {participant_name}, Dataset: {dataset_name}"
-        elif participant_name:
-            title_str = f"Boxplot for Participant: {participant_name}"
-        elif dataset_name:
+        if dataset_name:
             title_str = f"Boxplot for Dataset: {dataset_name}"
 
         if title_str:
             plt.title(title_str, fontsize=14)
 
         file_prefix = None
-        if participant_name and dataset_name:
-            file_prefix = f"boxplot_{participant_name.replace(' ', '_')}_{dataset_name.replace(' ', '_')}"
-        elif participant_name:
-            file_prefix = f"boxplot_{participant_name.replace(' ', '_')}"
-        elif dataset_name:
+        if dataset_name:
             file_prefix = f"boxplot_{dataset_name.replace(' ', '_')}"
 
         self.save(plt, prefix=file_prefix)
         plt.close('all')
 
-    def plot_dataset(self, data_table, columns, match='like', display='line', participant_name=None, dataset_name=None):
+    def plot_dataset(self, data_table, columns, match='like', display='line', dataset_name=None, method=None):
         data_table.index = pd.to_datetime(data_table.index)
         names = list(data_table.columns)
 
@@ -80,7 +72,6 @@ class VisualizeDataset:
 
         f.subplots_adjust(hspace=0.4)
 
-        # FIX: Changed the format string to '%H:%M:%S' to remove milliseconds.
         xfmt = md.DateFormatter('%H:%M:%S')
 
         for i in range(0, len(columns)):
@@ -110,8 +101,10 @@ class VisualizeDataset:
                                 self.line_displays[j % len(self.line_displays)])
 
             xar[i].tick_params(axis='y', labelsize=10)
-            xar[i].legend(relevant_cols, fontsize='xx-small', numpoints=1, loc='upper center',
-                          bbox_to_anchor=(0.5, 1.3), ncol=len(relevant_cols), fancybox=True, shadow=True)
+
+            # MODIFIED: Changed legend position to be on the right side of the plot.
+            xar[i].legend(relevant_cols, fontsize='xx-small', numpoints=1, loc='center left',
+                          bbox_to_anchor=(1.02, 0.5), ncol=1, fancybox=True, shadow=True)
 
             if min_values and max_values:
                 filtered_min_values = [v for v in min_values if pd.notna(v)]
@@ -132,23 +125,21 @@ class VisualizeDataset:
         plt.xlabel('time')
 
         title_str = ""
-        if participant_name and dataset_name:
-            title_str = f"Data for Participant: {participant_name}, Dataset: {dataset_name}"
-        elif participant_name:
-            title_str = f"Data for Participant: {participant_name}"
-        elif dataset_name:
-            title_str = f"Data for Dataset: {dataset_name}"
+        if method:
+            title_str = f"Plot for {method}"
 
         if title_str:
-            plt.suptitle(title_str, fontsize=16)
+            plt.suptitle(title_str, fontsize=14)
 
         file_prefix = None
-        if participant_name and dataset_name:
-            file_prefix = f"plot_{participant_name.replace(' ', '_')}_{dataset_name.replace(' ', '_')}"
-        elif participant_name:
-            file_prefix = f"plot_{participant_name.replace(' ', '_')}"
+        if dataset_name and method:
+            file_prefix = f"plot_{dataset_name.replace(' ', '_')}_{method}"
         elif dataset_name:
             file_prefix = f"plot_{dataset_name.replace(' ', '_')}"
+
+        # MODIFIED: Adjusted the 'right' boundary in the rect to make space for the legend.
+        # The value 0.85 means the plots will occupy the left 85% of the figure area.
+        plt.tight_layout(rect=[0, 0.03, 0.98, 0.95])
 
         self.save(plt, prefix=file_prefix)
         plt.close('all')
@@ -366,7 +357,7 @@ class VisualizeDataset:
         file_prefix = "all_features_over_relative_time_multi_dataset" if use_relative_time else "all_features_over_time_multi_dataset"
         self.save(fig, prefix=file_prefix)
 
-    def plot_binary_outliers(self, data_table, col, outlier_col):
+    def plot_binary_outliers(self, data_table, col, outlier_col, dataset_name=None, method=None):
         data_table.loc[:, :] = data_table.dropna(axis=0, subset=[col, outlier_col])
         data_table.loc[:, outlier_col] = data_table[outlier_col].astype('bool')
         f, xar = plt.subplots()
@@ -378,10 +369,10 @@ class VisualizeDataset:
         xar.plot(data_table.index[~data_table[outlier_col]], data_table[col][~data_table[outlier_col]], 'b+')
         plt.legend(['outlier ' + col, 'no_outlier_' + col], numpoints=1, fontsize='xx-small', loc='upper center',
                    ncol=2, fancybox=True, shadow=True)
-        self.save(plt)
+        self.save(plt,prefix=f"{dataset_name}_{method}")
         plt.close('all')
 
-    def plot_imputed_values(self, data_table, names, col, *values):
+    def plot_imputed_values(self, data_table, names, col, *values, dataset_name=None, method=None):
 
         xfmt = md.DateFormatter('%H:%M')
 
@@ -407,7 +398,7 @@ class VisualizeDataset:
 
         plt.setp([a.get_xticklabels() for a in f.axes[:-1]], visible=False)
         plt.xlabel('time')
-        self.save(plt)
+        self.save(plt, prefix=f"{dataset_name}_{method}")
         plt.close('all')
 
     def plot_clusters_3d(self, data_table, data_cols, cluster_col, label_cols, dataset_name=None, method=None):
@@ -493,26 +484,81 @@ class VisualizeDataset:
         self.save(plt, prefix=f"{dataset_name}_{method}")
         plt.close('all')
 
-    def plot_confusion_matrix(self, cm, classes, normalize=False):
+    def plot_confusion_matrix(self, cm, classes, normalize=False, dataset_name=None, method=None):
+
+        # Create a descriptive title and file prefix
+        title_str = 'Confusion Matrix'
+        if method:
+            title_str = f'Confusion Matrix: {method}'
+
+        file_prefix = 'confusion_matrix'
+        if dataset_name:
+            file_prefix = f"{file_prefix}_{dataset_name.replace(' ', '_')}"
+        if method:
+            file_prefix = f"{file_prefix}_{method.replace(' ', '_')}"
+
         cmap = plt.cm.Blues
+        plt.figure()
         plt.imshow(cm, interpolation='nearest', cmap=cmap)
-        plt.title('confusion matrix')
+        plt.title(title_str)
         plt.colorbar()
         tick_marks = np.arange(len(classes))
-        plt.xticks(tick_marks, classes, rotation=45)
+        plt.xticks(tick_marks, classes, rotation=45, ha="right")
         plt.yticks(tick_marks, classes)
 
         if normalize:
             cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+            print("Normalized confusion matrix")
+        else:
+            print('Confusion matrix, without normalization')
 
         thresh = cm.max() / 2.
         for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
-            plt.text(j, i, cm[i, j], horizontalalignment="center", color="white" if cm[i, j] > thresh else "black")
+            value = f"{cm[i, j]:.2f}" if normalize else f"{int(cm[i, j])}"
+            plt.text(j, i, value,
+                     horizontalalignment="center",
+                     color="white" if cm[i, j] > thresh else "black")
 
         plt.tight_layout()
         plt.ylabel('True label')
         plt.xlabel('Predicted label')
-        self.save(plt)
+
+        self.save(plt, prefix=file_prefix)
+        plt.close('all')
+
+    def plot_feature_importances(self, importances, feature_names, dataset_name=None, method=None):
+        """
+        Plots feature importances as a horizontal bar chart.
+
+        Args:
+            importances (array-like): The importance scores for each feature.
+            feature_names (array-like): The names of the features.
+            dataset_name (str, optional): The name of the dataset for titling. Defaults to None.
+            method (str, optional): The name of the method (e.g., 'RandomForest') for titling and saving. Defaults to None.
+        """
+        feature_importances = pd.Series(importances, index=feature_names)
+        feature_importances.sort_values(ascending=True, inplace=True)
+        fig, ax = plt.subplots(figsize=(10, 8))
+        ax.barh(feature_importances.index, feature_importances.values)
+
+        ax.set_xlabel("Feature Importance")
+        ax.set_ylabel("Features")
+
+        title = "Feature Importance"
+        if method:
+            title = f"Feature Importance: {method}"
+        if dataset_name:
+            title = f"{title} ({dataset_name})"
+        ax.set_title(title)
+        plt.tight_layout()
+
+        file_prefix = 'feature_importance'
+        if dataset_name:
+            file_prefix = f"{file_prefix}_{dataset_name.replace(' ', '_')}"
+        if method:
+            file_prefix = f"{file_prefix}_{method.replace(' ', '_')}"
+
+        self.save(plt, prefix=file_prefix)
         plt.close('all')
 
     def plot_numerical_prediction_versus_real(self, train_time, train_y, regr_train_y, test_time, test_y, regr_test_y,
@@ -579,27 +625,37 @@ class VisualizeDataset:
         self.plot_numerical_prediction_versus_real(train_time, train_y, regr_train_y, test_time, test_y, regr_test_y,
                                                    label)
 
-    def plot_performances(self, algs, feature_subset_names, scores_over_all_algs, ylim, std_mult, y_name):
-
+    def plot_performances(self, algs, feature_subset_names, scores_over_all_algs, ylim, std_mult, y_name, dataset_name):
         width = float(1) / (len(feature_subset_names) + 1)
         ind = np.arange(len(algs))
+
+        plt.figure(figsize=(12, 8))
+
         for i in range(0, len(feature_subset_names)):
             means = []
             std = []
             for j in range(0, len(algs)):
                 means.append(scores_over_all_algs[i][j][2])
                 std.append(std_mult * scores_over_all_algs[i][j][3])
-            plt.errorbar(ind + i * width, means, yerr=std, fmt=self.colors[i % len(self.colors)] + 'o', markersize='3')
+            plt.errorbar(ind + i * width, means, yerr=std, fmt=self.colors[i % len(self.colors)] + 'o', markersize='3',
+                         label=feature_subset_names[i])
+
         plt.ylabel(y_name)
-        plt.xticks(ind + (float(len(feature_subset_names)) / 2) * width, algs)
-        plt.legend(feature_subset_names, loc=4, numpoints=1)
+        plt.xticks(ind + (float(len(feature_subset_names) - 1) / 2) * width, algs)
+
+        plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1),
+                   fancybox=True, shadow=True, ncol=len(feature_subset_names), numpoints=1)
+
         if not ylim is None:
             plt.ylim(ylim)
-        self.save(plt)
+
+        plt.subplots_adjust(bottom=0.2)
+
+        self.save(plt, prefix=dataset_name)
         plt.close('all')
 
-    def plot_performances_classification(self, algs, feature_subset_names, scores_over_all_algs):
-        self.plot_performances(algs, feature_subset_names, scores_over_all_algs, None, 2, 'Accuracy')
+    def plot_performances_classification(self, algs, feature_subset_names, scores_over_all_algs, dataset_name):
+        self.plot_performances(algs, feature_subset_names, scores_over_all_algs, None, 2, 'Accuracy',dataset_name)
 
     def plot_performances_regression(self, algs, feature_subset_names, scores_over_all_algs):
         self.plot_performances(algs, feature_subset_names, scores_over_all_algs, None, 1, 'Mean Squared Error')

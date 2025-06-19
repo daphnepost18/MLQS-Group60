@@ -32,17 +32,34 @@ def print_flags():
 def main():
     print_flags()
 
-    # Get all chapter 2 result files as input
-    input_files = list(DATA_PATH.glob('chapter2_result_*.csv'))
+    # Create a boolean variable based on the new --source argument.
+    USE_ALL_FILES = (FLAGS.source == 'all')
+
+    if USE_ALL_FILES:
+        print("Mode: Processing all individual chapter 2 result files...")
+        all_chapter2_files = list(DATA_PATH.glob('chapter2_result_*.csv'))
+        input_files = [f for f in all_chapter2_files if 'combined' not in f.name]
+    else:
+        print("Mode: Processing only the combined chapter 2 result file...")
+        combined_file = DATA_PATH / 'chapter2_result_combined.csv'
+        if combined_file.exists():
+            input_files = [combined_file]
+        else:
+            input_files = []
 
     if not input_files:
-        print("No Chapter 2 result files found. Please run Chapter 2 first.")
+        if USE_ALL_FILES:
+            print("No individual Chapter 2 result files found. Please run Chapter 2 first.")
+        else:
+            print(
+                f"Combined file not found at '{DATA_PATH / 'chapter2_result_combined.csv'}'. Please run Chapter 2 to generate it.")
         return
 
     # Create the outlier classes once
     OutlierDistr = DistributionBasedOutlierDetection()
     OutlierDist = DistanceBasedOutlierDetection()
 
+    # The rest of the script remains the same, as it can loop through one or many files.
     for input_file_path in input_files:
         print(f"\n--- Processing file: {input_file_path.name} ---")
         try:
@@ -51,37 +68,30 @@ def main():
 
         except IOError as e:
             print(f'File not found: {input_file_path.name}. Skipping.')
-            continue # Skip to the next file
+            continue
 
-        # We'll create an instance of our visualization class to plot the results for each dataset.
         DataViz = VisualizeDataset(__file__)
-
-        # Determine the columns we want to experiment on.
-        outlier_columns = ['acc_X (m/s^2)','acc_Y (m/s^2)','acc_Z (m/s^2)']
-
-        # Construct the base name for the output file
+        outlier_columns = ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)']
         base_output_name = input_file_path.name.replace('chapter2_result_', 'chapter3_result_outliers_')
+        dataset_name = input_file_path.name.replace('chapter2_result_', '').replace('.csv', '')
 
         if FLAGS.mode == 'chauvenet':
             for col in outlier_columns:
                 print(f"Applying Chauvenet outlier criteria for column {col}")
                 dataset = OutlierDistr.chauvenet(dataset, col, FLAGS.C)
                 DataViz.plot_binary_outliers(
-                    dataset, col, col + '_outlier')
+                    dataset, col, col + '_outlier', dataset_name=dataset_name, method='Chauvenet')
             output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_chauvenet_C{FLAGS.C}.csv'
             dataset.to_csv(output_file)
             print(f"Results saved to: {output_file}")
-
 
         elif FLAGS.mode == 'mixture':
             for col in outlier_columns:
                 print(f"Applying mixture model for column {col}")
                 dataset = OutlierDistr.mixture_model(dataset, col)
                 DataViz.plot_dataset(dataset, [
-                    col, col + '_mixture'], ['exact', 'exact'], ['line', 'points'])
-                # This requires:
-                # n_data_points * n_data_points * point_size =
-                # 31839 * 31839 * 32 bits = ~4GB available memory
+                    col, col + '_mixture'], ['exact', 'exact'], ['line', 'points'], dataset_name=dataset_name,
+                                     method='Mixture')
             output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_mixture.csv'
             dataset.to_csv(output_file)
             print(f"Results saved to: {output_file}")
@@ -92,10 +102,9 @@ def main():
                     dataset = OutlierDist.simple_distance_based(
                         dataset, [col], 'euclidean', FLAGS.dmin, FLAGS.fmin)
                     DataViz.plot_binary_outliers(
-                        dataset, col, 'simple_dist_outlier')
+                        dataset, col, 'simple_dist_outlier', dataset_name=dataset_name, method='DistanceBased')
                 except MemoryError as e:
-                    print(
-                        'Not enough memory available for simple distance-based outlier detection...')
+                    print('Not enough memory available for simple distance-based outlier detection...')
                     print('Skipping.')
             output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_distance_dmin{FLAGS.dmin}_fmin{FLAGS.fmin}.csv'
             dataset.to_csv(output_file)
@@ -107,7 +116,7 @@ def main():
                     dataset = OutlierDist.local_outlier_factor(
                         dataset, [col], 'euclidean', FLAGS.K)
                     DataViz.plot_dataset(dataset, [col, 'lof'], [
-                        'exact', 'exact'], ['line', 'points'])
+                        'exact', 'exact'], ['line', 'points'], dataset_name=dataset_name, method=f"LOF_K{FLAGS.K}")
                 except MemoryError as e:
                     print('Not enough memory available for lof...')
                     print('Skipping.')
@@ -116,42 +125,47 @@ def main():
             print(f"Results saved to: {output_file}")
 
         elif FLAGS.mode == 'final':
-            # We use Chauvenet's criterion for the final version and apply it to all but the label data...
-            for col in [c for c in dataset.columns if not 'label' in c]:
-                print(f'Applying Chauvenet to: {col}')
-                dataset = OutlierDistr.chauvenet(dataset, col, FLAGS.C)
-                dataset.loc[dataset[f'{col}_outlier'] == True, col] = np.nan
-                del dataset[col + '_outlier']
+            for col in [c for c in dataset.columns if 'label' not in c]:
+                print(f'Applying Local Outlier Factor (LOF) to: {col}')
+                try:
+                    dataset = OutlierDist.local_outlier_factor(dataset, [col], 'euclidean', k=3)
+                    # Identify outliers: a rule of thumb is to consider points with an LOF score > 1.5 as outliers.
+                    # You can adjust this threshold if needed.
+                    outlier_indices = dataset[dataset['lof'] > 1.5].index
+                    # Replace the identified outlier values in the original column with NaN.
+                    dataset.loc[outlier_indices, col] = np.nan
+                    del dataset['lof']
 
-            output_file = DATA_PATH / f'{base_output_name}' # Uses the base name directly for final output
+                except MemoryError as e:
+                    print(f'Not enough memory available for LOF on column {col}... Skipping.')
+
+            output_file = DATA_PATH / f'{base_output_name}'
             dataset.to_csv(output_file)
             print(f"Final results for {input_file_path.name} saved to: {output_file}")
 
 
 if __name__ == '__main__':
-    # Command line arguments
     parser = argparse.ArgumentParser()
 
+    parser.add_argument('--source', type=str, default='combined',
+                        help="Specify the source files to process: 'all' for individual files, or 'combined' for the single combined file.",
+                        choices=['all', 'combined'])
+
     parser.add_argument('--mode', type=str, default='final',
-                        help="Select what version to run: LOF, distance, mixture, chauvenet or final \
-                        'LOF' applies the Local Outlier Factor to a single variable \
-                        'distance' applies a distance based outlier detection method to a single variable \
-                        'mixture' applies a mixture model to detect outliers for a single variable\
-                        'chauvenet' applies Chauvenet outlier detection method to a single variable \
-                        'final' is used for the next chapter",
+                        help="Select what version to run: LOF, distance, mixture, chauvenet or final",
                         choices=['LOF', 'distance', 'mixture', 'chauvenet', 'final'])
 
     parser.add_argument('--C', type=float, default=2,
                         help="Chauvenet: C parameter")
 
     parser.add_argument('--K', type=int, default=5,
-                        help="Local Outlier Factor:  K is the number of neighboring points considered")
+                        help="Local Outlier Factor: K is the number of neighboring points considered")
 
     parser.add_argument('--dmin', type=float, default=0.10,
-                        help="Simple distance based:  dmin is ... ")
+                        help="Simple distance based: dmin is ... ")
 
     parser.add_argument('--fmin', type=float, default=0.99,
-                        help="Simple distance based:  fmin is ... ")
+                        help="Simple distance based: fmin is ... ")
 
     FLAGS, unparsed = parser.parse_known_args()
 
