@@ -41,7 +41,7 @@ def grid_search_and_save_outputs():
     param_grid = {
         'n_estimators': [25, 50, 100],
         'max_depth': [1, 2, 3],
-        'learning_rate': [0.01, 0.1, 0.2],
+        'learning_rate': [0.01, 0.05, 0.1],
         'random_state': [123]
     }
     
