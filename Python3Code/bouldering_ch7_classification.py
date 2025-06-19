@@ -75,7 +75,7 @@ def main():
         prepare = PrepareDatasetForLearning()
 
         train_X, test_X, train_y, test_y = prepare.split_single_dataset_classification(dataset, ['label'], 'like', 0.8,
-                                                                                       filter=True, temporal=True)
+                                                                                       filter=True, temporal=False)
 
         print('Training set length is: ', len(train_X.index))
         print('Test set length is: ', len(test_X.index))
@@ -115,9 +115,6 @@ def main():
         learner = ClassificationAlgorithms()
         eval = ClassificationEvaluation()
 
-        # --------------------------------------------------------------
-        # NEW: Added back the hyperparameter study section
-        # --------------------------------------------------------------
         print("\nStudying impact of regularization and model complexity...")
 
         reg_parameters = [0.0001, 0.001, 0.01, 0.1, 1, 10]
@@ -159,9 +156,6 @@ def main():
                         xlabel='minimum number of points per leaf', ylabel='accuracy',
                         names=['training', 'test'], line_styles=['r-', 'b:'], dataset_name=dataset_name,
                         methodch3='leaf_settings')
-        # --------------------------------------------------------------
-        # END of new section
-        # --------------------------------------------------------------
 
         possible_feature_sets = [basic_features, features_after_chapter_3, features_after_chapter_4,
                                  features_after_chapter_5, selected_features]
@@ -181,7 +175,6 @@ def main():
             selected_train_X = train_X[current_features]
             selected_test_X = test_X[current_features]
 
-            # This section remains the same as the last version, with SVM included and confusion matrices for all.
             performance_tr_nn, performance_te_nn = (0, 0)
             performance_tr_rf, performance_te_rf = (0, 0)
             performance_tr_svm, performance_te_svm = (0, 0)
