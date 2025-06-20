@@ -707,3 +707,57 @@ class VisualizeDataset:
 
         self.save(plt, prefix=file_prefix)
         plt.close('all')
+
+    def plot_prediction_probability_distribution(self, y_true, y_probas, dataset_name=None, method=None):
+        """
+        Plots the distribution of predicted probabilities for each class.
+
+        For each true class, this plot shows the distribution of the probabilities
+        predicted by the model for that class. A good model should have distributions
+        peaked towards 1.
+
+        Args:
+            y_true (pd.Series or np.array): The true labels of the test set.
+            y_probas (pd.DataFrame): DataFrame where columns are class names and values
+                                     are the predicted probabilities for each class.
+            dataset_name (str, optional): The name of the dataset for titling.
+            method (str, optional): The name of the model for titling.
+        """
+        # Ensure seaborn is available
+        try:
+            import seaborn as sns
+        except ImportError:
+            print("Seaborn not found. Please install it using 'pip install seaborn'")
+            return
+
+        # Combine true labels and probabilities for easier filtering
+        y_true_df = y_true.to_frame(name='true_label')
+        df = pd.concat([y_true_df.reset_index(drop=True), y_probas.reset_index(drop=True)], axis=1)
+
+        classes = y_probas.columns
+
+        plt.figure(figsize=(12, 8))
+
+        for i, target_class in enumerate(classes):
+            # Select probabilities for instances where the true label is the target_class
+            subset = df[df['true_label'] == target_class]
+            if not subset.empty:
+                # Plot the distribution of predicted probabilities for that class
+                sns.kdeplot(subset[target_class], label=f'True: {target_class}', fill=True,
+                            color=self.colors[i % len(self.colors)])
+
+        plt.xlim(0, 1)
+        plt.title(f'Prediction Probability Distribution for {method} ({dataset_name})')
+        plt.xlabel('Predicted Probability')
+        plt.ylabel('Density')
+        plt.legend()
+        plt.grid(True, linestyle='--', alpha=0.6)
+
+        file_prefix = 'prob_dist'
+        if dataset_name:
+            file_prefix = f"{file_prefix}_{dataset_name.replace(' ', '_')}"
+        if method:
+            file_prefix = f"{file_prefix}_{method.replace(' ', '_')}"
+
+        self.save(plt, prefix=file_prefix)
+        plt.close('all')

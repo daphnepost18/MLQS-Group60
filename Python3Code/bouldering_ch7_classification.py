@@ -257,15 +257,23 @@ def main():
                 cm_nn = eval.confusion_matrix(test_y, last_pred_nn, last_prob_nn.columns)
                 DataViz.plot_confusion_matrix(cm_nn, last_prob_nn.columns, normalize=False, dataset_name=dataset_name,
                                               method=f'{feature_names[i]}_NN')
+
                 cm_rf = eval.confusion_matrix(test_y, last_pred_rf, last_prob_rf.columns)
                 DataViz.plot_confusion_matrix(cm_rf, last_prob_rf.columns, normalize=False, dataset_name=dataset_name,
                                               method=f'{feature_names[i]}_RF')
+
+                if feature_names[i] == 'Selected Features':
+                    print("Generating prediction probability plot for RandomForest...")
+                    DataViz.plot_prediction_probability_distribution(test_y, last_prob_rf, dataset_name=dataset_name,
+                                                                     method='RandomForest')
+
                 cm_svm = eval.confusion_matrix(test_y, last_pred_svm, last_prob_svm.columns)
                 DataViz.plot_confusion_matrix(cm_svm, last_prob_svm.columns, normalize=False, dataset_name=dataset_name,
                                               method=f'{feature_names[i]}_SVM')
 
                 print("\nTraining Deterministic Classifiers...")
                 print(f"Featureset: {feature_names[i]}")
+
                 print("Training K-Nearest Neighbor...")
                 c_train_y_knn, c_test_y_knn, c_train_p_knn, _ = learner.k_nearest_neighbor(selected_train_X, train_y,
                                                                                            selected_test_X,
@@ -277,16 +285,19 @@ def main():
                                               method=f'{feature_names[i]}_KNN')
 
                 print("Training Decision Tree...")
-                # MODIFIED: Capture the returned model object
                 c_train_y_dt, c_test_y_dt, c_train_p_dt, dt_model = learner.decision_tree(selected_train_X, train_y,
                                                                                           selected_test_X,
                                                                                           gridsearch=True)
                 performance_tr_dt = eval.accuracy(train_y, c_train_y_dt)
                 performance_te_dt = eval.accuracy(test_y, c_test_y_dt)
-                last_model_dt = dt_model  # Save the decision tree model
                 cm_dt = eval.confusion_matrix(test_y, c_test_y_dt, c_train_p_dt.columns)
                 DataViz.plot_confusion_matrix(cm_dt, c_train_p_dt.columns, normalize=False, dataset_name=dataset_name,
                                               method=f'{feature_names[i]}_DT')
+
+                if feature_names[i] == 'Selected Features':
+                    print("Generating prediction probability plot for Decision Tree...")
+                    DataViz.plot_prediction_probability_distribution(test_y, c_train_p_dt, dataset_name=dataset_name,
+                                                                     method='DecisionTree')
 
                 print("Training Naive Bayes...")
                 c_train_y_nb, c_test_y_nb, c_train_p_nb, _ = learner.naive_bayes(selected_train_X, train_y,
