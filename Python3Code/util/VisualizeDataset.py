@@ -659,3 +659,51 @@ class VisualizeDataset:
 
     def plot_performances_regression(self, algs, feature_subset_names, scores_over_all_algs):
         self.plot_performances(algs, feature_subset_names, scores_over_all_algs, None, 1, 'Mean Squared Error')
+
+    def plot_feature_importances(self, importances, feature_names, dataset_name=None, method=None):
+        """
+        Plots feature importances as a horizontal bar chart.
+
+        Args:
+            importances (array-like): The importance scores for each feature.
+            feature_names (array-like): The names of the features.
+            dataset_name (str, optional): The name of the dataset for titling. Defaults to None.
+            method (str, optional): The name of the method (e.g., 'RandomForest') for titling and saving. Defaults to None.
+        """
+        # Create a pandas Series for easier handling and sorting
+        feature_importances = pd.Series(importances, index=feature_names)
+
+        # Select top 20 features for clarity, if more are available
+        n_top_features = 20
+        if len(feature_importances) > n_top_features:
+            feature_importances = feature_importances.nlargest(n_top_features)
+
+        feature_importances.sort_values(ascending=True, inplace=True)
+
+        # Create the plot
+        fig, ax = plt.subplots(figsize=(12, 8))
+        ax.barh(feature_importances.index, feature_importances.values)
+
+        ax.set_xlabel("Feature Importance")
+        ax.set_ylabel("Features")
+
+        # Create a descriptive title
+        title = "Feature Importance"
+        if method:
+            title = f"Feature Importance: {method}"
+        if dataset_name:
+            title = f"{title} ({dataset_name})"
+        ax.set_title(title)
+
+        # Ensure layout is tight and readable
+        plt.tight_layout()
+
+        # Create a descriptive file name
+        file_prefix = 'feature_importance'
+        if dataset_name:
+            file_prefix = f"{file_prefix}_{dataset_name.replace(' ', '_')}"
+        if method:
+            file_prefix = f"{file_prefix}_{method.replace(' ', '_')}"
+
+        self.save(plt, prefix=file_prefix)
+        plt.close('all')
