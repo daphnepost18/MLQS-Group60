@@ -37,15 +37,43 @@ def main():
 
     start_time = time.time()
 
-    input_files = list(DATA_PATH.glob('chapter3_result_final_*.csv'))
+    USE_ALL_FILES = (FLAGS.source == 'all')
+
+    if USE_ALL_FILES:
+        print("Mode: Processing all individual chapter 3 final result files...")
+        all_chapter3_files = list(DATA_PATH.glob('chapter3_result_final_*.csv'))
+        input_files = [f for f in all_chapter3_files if 'combined' not in f.name]
+    else:
+        print("Mode: Processing only the combined chapter 3 final result file...")
+        combined_file = DATA_PATH / 'chapter3_result_final_combined.csv'
+        if combined_file.exists():
+            input_files = [combined_file]
+        else:
+            input_files = []
 
     if not input_files:
-        print("No Chapter 3 final result files found. Please run bouldering_ch3_rest.py with --mode final first.")
+        if USE_ALL_FILES:
+            print(
+                "No individual Chapter 3 final result files found. Please run bouldering_ch3_rest.py with '--mode final' first.")
+        else:
+            print(
+                f"Combined file not found at '{DATA_PATH / 'chapter3_result_final_combined.csv'}'. Please run bouldering_ch3_rest.py with '--mode final' and '--source combined'.")
         return
 
     NumAbs = NumericalAbstraction()
     FreqAbs = FourierTransformation()
-    # DO NOT create CatAbs here. It must be created inside the loop.
+
+    ACC_X = 'acc_X (m/s^2)'
+    ACC_Y = 'acc_Y (m/s^2)'
+    ACC_Z = 'acc_Z (m/s^2)'
+
+    GYR_X = 'gyr_X (rad/s)'
+    GYR_Y = 'gyr_Y (rad/s)'
+    GYR_Z = 'gyr_Z (rad/s)'
+
+    MAG_X = 'mag_X (µT)'
+    MAG_Y = 'mag_Y (µT)'
+    MAG_Z = 'mag_Z (µT)'
 
     for input_file_path in input_files:
         print(f"\n--- Processing file: {input_file_path.name} ---")
@@ -68,81 +96,195 @@ def main():
             continue
 
         base_output_name = input_file_path.name.replace('chapter3_result_final_', 'chapter4_result_')
-        dataset_name = input_file_path.name.replace('chapter3_result_final_', 'chapter4_result_').replace('.csv', '')
+        dataset_name = input_file_path.name.replace('chapter3_result_final_', '').replace('.csv', '')
 
         if FLAGS.mode == 'aggregation':
-            window_sizes = [int(5000 / milliseconds_per_instance),
-                            int(30000 / milliseconds_per_instance),
-                            int(300000 / milliseconds_per_instance)]
-            ACC_X = 'acc_X (m/s^2)'
+            ws_s = [2, 5, 10]  # window sizes in seconds
+            window_sizes = [int(s * 1000 / milliseconds_per_instance) for s in ws_s]
+
             for ws in window_sizes:
-                dataset = NumAbs.abstract_numerical(dataset, [ACC_X], ws, 'mean')
-                dataset = NumAbs.abstract_numerical(dataset, [ACC_X], ws, 'std')
-            DataViz.plot_dataset(dataset, [ACC_X, f'{ACC_X}_temp_mean', f'{ACC_X}_temp_std', 'label'],
-                                 ['exact', 'like', 'like', 'like'], ['line', 'line', 'line', 'points'],
+                if ws > 0:
+                    dataset = NumAbs.abstract_numerical(dataset, [ACC_X, ACC_Y, ACC_Z, GYR_X, GYR_Y, GYR_Z, MAG_X, MAG_Y, MAG_Z], ws, 'mean')
+                    dataset = NumAbs.abstract_numerical(dataset, [ACC_X, ACC_Y, ACC_Z, GYR_X, GYR_Y, GYR_Z, MAG_X, MAG_Y, MAG_Z], ws, 'std')
+                    dataset = NumAbs.abstract_numerical(dataset, [ACC_X, ACC_Y, ACC_Z, GYR_X, GYR_Y, GYR_Z, MAG_X, MAG_Y, MAG_Z], ws, 'median')
+
+            DataViz.plot_dataset(dataset, [ACC_X, f'{ACC_X}_temp_mean', f'{ACC_X}_temp_std', f'{ACC_X}_temp_median', 'label'],
+                                 ['exact', 'like', 'like', 'like', 'like'], ['line', 'line', 'line', 'line', 'points'],
                                  dataset_name=dataset_name, method='Aggregation')
-            output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_aggregation.csv'
+            output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_aggregation_X.csv'
             dataset.to_csv(output_file)
             print(f"Results for {input_file_path.name} saved to: {output_file}")
+
+            # Visualize the Y component of acceleration too
+            DataViz.plot_dataset(dataset, [ACC_Y, f'{ACC_Y}_temp_mean', f'{ACC_Y}_temp_std', f'{ACC_Y}_temp_median', 'label'],
+                                 ['exact', 'like', 'like', 'like', 'like'], ['line', 'line', 'line', 'line', 'points'],
+                                 dataset_name=dataset_name, method='Aggregation')
+            output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_aggregation_Y.csv'
+            dataset.to_csv(output_file)
+            print(f"Results for {input_file_path.name} saved to: {output_file}")
+
+            # Visualize the Z component of acceleration too
+            DataViz.plot_dataset(dataset, [ACC_Z, f'{ACC_Z}_temp_mean', f'{ACC_Z}_temp_std', f'{ACC_Z}_temp_median', 'label'],
+                                 ['exact', 'like', 'like', 'like', 'like'], ['line', 'line', 'line', 'line', 'points'],
+                                 dataset_name=dataset_name, method='Aggregation')
+            output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_aggregation_Z.csv'
+            dataset.to_csv(output_file)
+            print(f"Results for {input_file_path.name} saved to: {output_file}")
+
+# --------------------- GYROSCOPE DATA ---------------------------
+            DataViz.plot_dataset(dataset, [f'{GYR_X}_temp_mean', f'{GYR_X}_temp_std', f'{GYR_X}_temp_median', 'label'],
+                                 ['like', 'like', 'like', 'like'], ['line', 'line', 'line', 'points'],
+                                 dataset_name=dataset_name, method='Aggregation')
+            output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_aggregation_X.csv'
+            dataset.to_csv(output_file)
+            print(f"Results for {input_file_path.name} saved to: {output_file}")
+
+            DataViz.plot_dataset(dataset, [f'{GYR_Y}_temp_mean', f'{GYR_Y}_temp_std', f'{GYR_Y}_temp_median', 'label'],
+                                 ['like', 'like', 'like', 'like'], ['line', 'line', 'line', 'points'],
+                                 dataset_name=dataset_name, method='Aggregation')
+            output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_aggregation_Y.csv'
+            dataset.to_csv(output_file)
+            print(f"Results for {input_file_path.name} saved to: {output_file}")
+
+            DataViz.plot_dataset(dataset, [f'{GYR_Z}_temp_mean', f'{GYR_Z}_temp_std', f'{GYR_Z}_temp_median', 'label'],
+                                 ['like', 'like', 'like', 'like'], ['line', 'line', 'line', 'points'],
+                                 dataset_name=dataset_name, method='Aggregation')
+            output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_aggregation_Z.csv'
+            dataset.to_csv(output_file)
+            print(f"Results for {input_file_path.name} saved to: {output_file}")
+
+# --------------------- MAGNETIC FIELD DATA ---------------------------
+
+            DataViz.plot_dataset(dataset, [MAG_X, f'{MAG_X}_temp_mean', f'{MAG_X}_temp_std', f'{MAG_X}_temp_median', 'label'],
+                                 ['exact', 'like', 'like', 'like', 'like'], ['line', 'line', 'line', 'line', 'points'],
+                                 dataset_name=dataset_name, method='Aggregation')
+            output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_aggregation_X.csv'
+            dataset.to_csv(output_file)
+            print(f"Results for {input_file_path.name} saved to: {output_file}")
+
+            # Visualize the Y component of acceleration too
+            DataViz.plot_dataset(dataset, [MAG_Y, f'{MAG_Y}_temp_mean', f'{MAG_Y}_temp_std', f'{MAG_Y}_temp_median', 'label'],
+                                 ['exact', 'like', 'like', 'like', 'like'], ['line', 'line', 'line', 'line', 'points'],
+                                 dataset_name=dataset_name, method='Aggregation')
+            output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_aggregation_Y.csv'
+            dataset.to_csv(output_file)
+            print(f"Results for {input_file_path.name} saved to: {output_file}")
+
+            # Visualize the Z component of acceleration too
+            DataViz.plot_dataset(dataset, [MAG_Z, f'{MAG_Z}_temp_mean', f'{MAG_Z}_temp_std', f'{MAG_Z}_temp_median', 'label'],
+                                 ['exact', 'like', 'like', 'like', 'like'], ['line', 'line', 'line', 'line', 'points'],
+                                 dataset_name=dataset_name, method='Aggregation')
+            output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_aggregation_Z.csv'
+            dataset.to_csv(output_file)
+            print(f"Results for {input_file_path.name} saved to: {output_file}")
+
 
         if FLAGS.mode == 'frequency':
-            fs = 1000 / milliseconds_per_instance
-            ws = int(10000 / milliseconds_per_instance)
-            ACC_X = 'acc_X (m/s^2)'
-            dataset = FreqAbs.abstract_frequency(dataset, [ACC_X], ws, fs)
-            DataViz.plot_dataset(dataset, [f'{ACC_X}_max_freq', f'{ACC_X}_freq_weighted', f'{ACC_X}_pse', 'label'],
-                                 ['like', 'like', 'like', 'like'], ['line', 'line', 'line', 'points'],
-                                 dataset_name=dataset_name, method='Frequency')
-            output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_frequency.csv'
-            dataset.to_csv(output_file)
-            print(f"Results for {input_file_path.name} saved to: {output_file}")
+            fs = 5000 / milliseconds_per_instance
+            ws = int(50000 / milliseconds_per_instance)
+
+            if ws > 0:
+                dataset = FreqAbs.abstract_frequency(dataset, [ACC_X, ACC_Y, ACC_Z, GYR_X, GYR_Y, GYR_Z, MAG_X, MAG_Y, MAG_Z], ws, fs)
+
+                DataViz.plot_dataset(dataset, [f'{ACC_X}_max_freq', f'{ACC_X}_freq_weighted', f'{ACC_X}_pse', 'label'],
+                                     ['like', 'like', 'like', 'like'], ['line', 'line', 'line', 'points'],
+                                     dataset_name=dataset_name, method='Frequency')
+                output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_frequency_X.csv'
+                dataset.to_csv(output_file)
+                print(f"Results for {input_file_path.name} saved to: {output_file}")
+
+                DataViz.plot_dataset(dataset, [f'{ACC_Y}_max_freq', f'{ACC_Y}_freq_weighted', f'{ACC_Y}_pse', 'label'],
+                                     ['like', 'like', 'like', 'like'], ['line', 'line', 'line', 'points'],
+                                     dataset_name=dataset_name, method='Frequency')
+                output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_frequency_Y.csv'
+                dataset.to_csv(output_file)
+                print(f"Results for {input_file_path.name} saved to: {output_file}")
+
+                DataViz.plot_dataset(dataset, [f'{ACC_Z}_max_freq', f'{ACC_Z}_freq_weighted', f'{ACC_Z}_pse', 'label'],
+                                     ['like', 'like', 'like', 'like'], ['line', 'line', 'line', 'points'],
+                                     dataset_name=dataset_name, method='Frequency')
+                output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_frequency_Z.csv'
+                dataset.to_csv(output_file)
+                print(f"Results for {input_file_path.name} saved to: {output_file}")
+
+ # --------------------- GYROSCOPE DATA ---------------------------
+
+                DataViz.plot_dataset(dataset, [f'{GYR_X}_max_freq', f'{GYR_X}_freq_weighted', f'{GYR_X}_pse', 'label'],
+                                     ['like', 'like', 'like', 'like'], ['line', 'line', 'line', 'points'],
+                                     dataset_name=dataset_name, method='Frequency')
+                output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_frequency_X.csv'
+                dataset.to_csv(output_file)
+                print(f"Results for {input_file_path.name} saved to: {output_file}")
+
+                DataViz.plot_dataset(dataset, [f'{GYR_Y}_max_freq', f'{GYR_Y}_freq_weighted', f'{GYR_Y}_pse', 'label'],
+                                     ['like', 'like', 'like', 'like'], ['line', 'line', 'line', 'points'],
+                                     dataset_name=dataset_name, method='Frequency')
+                output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_frequency_Y.csv'
+                dataset.to_csv(output_file)
+                print(f"Results for {input_file_path.name} saved to: {output_file}")
+
+                DataViz.plot_dataset(dataset, [f'{GYR_Z}_max_freq', f'{GYR_Z}_freq_weighted', f'{GYR_Z}_pse', 'label'],
+                                     ['like', 'like', 'like', 'like'], ['line', 'line', 'line', 'points'],
+                                     dataset_name=dataset_name, method='Frequency')
+                output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_frequency_Z.csv'
+                dataset.to_csv(output_file)
+                print(f"Results for {input_file_path.name} saved to: {output_file}")
+
+# --------------------- MAGNETIC FIELD DATA ---------------------------
+
+                DataViz.plot_dataset(dataset, [f'{MAG_X}_max_freq', f'{MAG_X}_freq_weighted', f'{MAG_X}_pse', 'label'],
+                                     ['like', 'like', 'like', 'like'], ['line', 'line', 'line', 'points'],
+                                     dataset_name=dataset_name, method='Frequency')
+                output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_frequency_X.csv'
+                dataset.to_csv(output_file)
+                print(f"Results for {input_file_path.name} saved to: {output_file}")
+
+                DataViz.plot_dataset(dataset, [f'{MAG_Y}_max_freq', f'{MAG_Y}_freq_weighted', f'{MAG_Y}_pse', 'label'],
+                                     ['like', 'like', 'like', 'like'], ['line', 'line', 'line', 'points'],
+                                     dataset_name=dataset_name, method='Frequency')
+                output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_frequency_Y.csv'
+                dataset.to_csv(output_file)
+                print(f"Results for {input_file_path.name} saved to: {output_file}")
+
+                DataViz.plot_dataset(dataset, [f'{MAG_Z}_max_freq', f'{MAG_Z}_freq_weighted', f'{MAG_Z}_pse', 'label'],
+                                     ['like', 'like', 'like', 'like'], ['line', 'line', 'line', 'points'],
+                                     dataset_name=dataset_name, method='Frequency')
+                output_file = DATA_PATH / f'{base_output_name.replace(".csv", "")}_frequency_Z.csv'
+                dataset.to_csv(output_file)
+                print(f"Results for {input_file_path.name} saved to: {output_file}")
 
         if FLAGS.mode == 'final':
-            ws = int(3000 / milliseconds_per_instance)
-            fs = 100 / milliseconds_per_instance
+            ws = int(5000 / milliseconds_per_instance)
+            if ws == 0:
+                print("Window size is zero, skipping final processing.")
+                continue
+
+            fs = 2000 / milliseconds_per_instance
 
             selected_predictor_cols = [c for c in dataset.columns
-                                       if 'label' not in c and pd.api.types.is_numeric_dtype(dataset[c]) and not pd.api.types.is_bool_dtype(dataset[c])]
+                                       if 'label' not in c and pd.api.types.is_numeric_dtype(
+                    dataset[c]) and not pd.api.types.is_bool_dtype(dataset[c])]
             dataset = NumAbs.abstract_numerical(dataset, selected_predictor_cols, ws, 'mean')
             dataset = NumAbs.abstract_numerical(dataset, selected_predictor_cols, ws, 'std')
 
-            ACC_X = 'acc_X (m/s^2)'
-            GYR_X = 'gyr_X (rad/s)'
-            MAG_X = 'mag_X (µT)'
-            LOC_HEIGHT = 'loc_Height (m)'
-            PCA_1 = 'pca_1'
-            DataViz.plot_dataset(dataset, [ACC_X, GYR_X, MAG_X, LOC_HEIGHT, PCA_1, 'label'],
-                                 ['like', 'like', 'like', 'like', 'like', 'like'],
-                                 ['line', 'line', 'line', 'line', 'line', 'points'],
-                                 dataset_name=dataset_name, method='Final')
-
-            # FIX: Instantiate CategoricalAbstraction INSIDE the loop.
-            # This creates a fresh, stateless object for each file.
-            CatAbs = CategoricalAbstraction()
-
-            label_cols = [col for col in dataset.columns if col.startswith('label')]
-            if label_cols:
-                dataset = CatAbs.abstract_categorical(dataset, ['label'], ['like'], 0.03,
-                                                      ws, 2)
-            else:
-                print(f"Warning: No label columns found in {input_file_path.name}. Skipping categorical abstraction.")
-
+            # CatAbs = CategoricalAbstraction()
+            # label_cols = [col for col in dataset.columns if col.startswith('label')]
+            # if label_cols:
+            #     dataset = CatAbs.abstract_categorical(dataset, label_cols, ['exact'] * len(label_cols), 0.03, ws, 2)
+            #
             periodic_predictor_cols = ['acc_X (m/s^2)', 'acc_Y (m/s^2)', 'acc_Z (m/s^2)',
-                                       "gyr_X (rad/s)","gyr_Y (rad/s)","gyr_Z (rad/s)",
-                                       "mag_X (µT)","mag_Y (µT)","mag_Z (µT)",
-                                       "loc_Height (m)","loc_Velocity (m/s)"]
-            periodic_measurements_for_freq = [col for col in periodic_predictor_cols
-                                              if col in dataset.columns and pd.api.types.is_numeric_dtype(dataset[col])]
+                                       "gyr_X (rad/s)", "gyr_Y (rad/s)", "gyr_Z (rad/s)",
+                                       "mag_X (µT)", "mag_Y (µT)", "mag_Z (µT)"]
+
+            periodic_measurements_for_freq = [col for col in periodic_predictor_cols if
+                                              col in dataset.columns and pd.api.types.is_numeric_dtype(dataset[col])]
+
             if periodic_measurements_for_freq:
-                dataset = FreqAbs.abstract_frequency(copy.deepcopy(dataset), periodic_measurements_for_freq,
-                                                     ws, fs)
-            else:
-                print(f"Warning: No valid periodic measurements found in {input_file_path.name}. Skipping.")
+                dataset = FreqAbs.abstract_frequency(copy.deepcopy(dataset), periodic_measurements_for_freq, ws, fs)
 
             window_overlap = 0.9
             skip_points = int((1 - window_overlap) * ws)
-            if skip_points == 0:
-                skip_points = 1
+            if skip_points == 0: skip_points = 1
             dataset = dataset.iloc[::skip_points, :]
 
             output_file = DATA_PATH / f'{base_output_name}'
@@ -153,13 +295,15 @@ def main():
 
 
 if __name__ == '__main__':
-    # Command line arguments
     parser = argparse.ArgumentParser()
+
+    parser.add_argument('--source', type=str, default='combined',
+                        help="Specify source: 'all' for individual files, or 'combined' for the single combined file.",
+                        choices=['all', 'combined'])
+
     parser.add_argument('--mode', type=str, default='final',
-                        help="Select what version to run: final, aggregation or freq \
-                        'aggregation' studies the effect of several aggeregation methods \
-                        'frequency' applies a Fast Fourier transformation to a single variable \
-                        'final' is used for the next chapter ", choices=['aggregation', 'frequency', 'final'])
+                        help="Select what version to run: final, aggregation or frequency.",
+                        choices=['aggregation', 'frequency', 'final'])
 
     FLAGS, unparsed = parser.parse_known_args()
 
