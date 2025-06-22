@@ -107,7 +107,7 @@ def lstm_classification():
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
         model.train()
-        for epoch in range(10):  # Fixed number of epochs
+        for epoch in range(25):  # Fixed number of epochs
             for X_batch, y_batch in train_loader:
                 # Ensure X_batch has the correct shape (batch_size, sequence_length, input_size)
                 if len(X_batch.shape) == 4:  # If X_batch has an extra dimension
@@ -141,10 +141,9 @@ def lstm_classification():
     
     # Run Optuna optimization
     study = optuna.create_study(direction="maximize")
-    study.optimize(objective, n_trials=5)
+    study.optimize(objective, n_trials=25)
 
     print("Best hyperparameters:", study.best_params)
-
 
 
     #     # Generate confusion matrix
