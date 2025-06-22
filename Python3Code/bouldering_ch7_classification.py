@@ -15,7 +15,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import time
 import argparse
-
+import xgboost as xgb
+from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 
 from Chapter7.PrepareDatasetForLearning import PrepareDatasetForLearning
@@ -169,7 +170,7 @@ def main():
             current_features = possible_feature_sets[i]
             if not current_features or not all(f in train_X.columns for f in current_features):
                 print(f"Skipping feature set '{feature_names[i]}' as it contains missing or no features.")
-                scores_over_all_algs.append([(0, 0)] * 6)  # 6 algorithms
+                scores_over_all_algs.append([(0, 0)] * 7)  # 7 algorithms
                 continue
 
             selected_train_X = train_X[current_features]
@@ -178,9 +179,12 @@ def main():
             performance_tr_nn, performance_te_nn = (0, 0)
             performance_tr_rf, performance_te_rf = (0, 0)
             performance_tr_svm, performance_te_svm = (0, 0)
+            performance_tr_xgb, performance_te_xgb = (0, 0)
+
             last_pred_nn, last_prob_nn = (None, None)
             last_pred_rf, last_prob_rf = (None, None)
             last_pred_svm, last_prob_svm = (None, None)
+            last_pred_xgb, last_prob_xgb = (None, None)
 
             for repeat in range(N_KCV_REPEATS):
                 print(f"\nRun {repeat + 1}/{N_KCV_REPEATS} for feature set: '{feature_names[i]}'")
@@ -203,6 +207,72 @@ def main():
                 performance_tr_svm += eval.accuracy(train_y, c_train_y)
                 performance_te_svm += eval.accuracy(test_y, c_test_y)
                 if repeat == N_KCV_REPEATS - 1: last_pred_svm, last_prob_svm = c_test_y, c_train_p
+        
+                # This section is modified to capture the trained models and plot feature importances.
+                performance_tr_nn, performance_te_nn = (0, 0)
+                performance_tr_rf, performance_te_rf = (0, 0)
+                performance_tr_svm, performance_te_svm = (0, 0)
+                performance_te_xgb, performance_tr_xgb = (0, 0)
+
+                last_pred_nn, last_prob_nn = (None, None)
+                last_pred_rf, last_prob_rf = (None, None)
+                last_pred_svm, last_prob_svm = (None, None)
+                last_pred_xgb, last_prob_xgb = (None, None)
+
+                # NEW: variables to store the last trained models for feature importance plotting
+                last_model_rf = None
+                last_model_dt = None
+                last_model_xgb = None
+
+                for repeat in range(N_KCV_REPEATS):
+                    print(f"\nRun {repeat + 1}/{N_KCV_REPEATS} for feature set: '{feature_names[i]}'")
+                    print("Training NeuralNetwork...")
+                    c_train_y, c_test_y, c_train_p, _ = learner.feedforward_neural_network(selected_train_X, train_y,
+                                                                                           selected_test_X,
+                                                                                           gridsearch=True)
+                    performance_tr_nn += eval.accuracy(train_y, c_train_y)
+                    performance_te_nn += eval.accuracy(test_y, c_test_y)
+                    if repeat == N_KCV_REPEATS - 1: last_pred_nn, last_prob_nn = c_test_y, c_train_p
+
+                    print("Training RandomForest...")
+                    # MODIFIED: Capture the returned model object
+                    c_train_y, c_test_y, c_train_p, rf_model = learner.random_forest(selected_train_X, train_y,
+                                                                                     selected_test_X,
+                                                                                     gridsearch=True)
+                    performance_tr_rf += eval.accuracy(train_y, c_train_y)
+                    performance_te_rf += eval.accuracy(test_y, c_test_y)
+                    # MODIFIED: Save the model from the last repeat
+                    if repeat == N_KCV_REPEATS - 1:
+                        last_pred_rf, last_prob_rf, last_model_rf = c_test_y, c_train_p, rf_model
+
+                    print("Training SVM...")
+                    c_train_y, c_test_y, c_train_p, _ = learner.support_vector_machine_with_kernel(selected_train_X,
+                                                                                                   train_y,
+                                                                                                   selected_test_X,
+                                                                                                   gridsearch=True)
+                    performance_tr_svm += eval.accuracy(train_y, c_train_y)
+                    performance_te_svm += eval.accuracy(test_y, c_test_y)
+                    if repeat == N_KCV_REPEATS - 1: last_pred_svm, last_prob_svm = c_test_y, c_train_p
+                
+                    print("Training XGBoost...")
+                    xgb_clf = xgb.XGBClassifier( # Parameters from Grid search of other file
+                        use_label_encoder=False,
+                        eval_metric='logloss',
+                        learning_rate=0.1,
+                        max_depth=3,        
+                        n_estimators=100,
+                        random_state=1234    
+                    )
+                    xgb_clf.fit(selected_train_X, train_y)
+
+                    c_train_y = xgb_clf.predict(selected_train_X)
+                    c_test_y = xgb_clf.predict(selected_test_X)
+
+                    performance_tr_xgb += eval.accuracy(train_y, c_train_y)
+                    performance_te_xgb += eval.accuracy(test_y, c_test_y)
+                    if repeat == N_KCV_REPEATS - 1:
+                        last_pred_xgb, last_prob_xgb = c_test_y, xgb_clf.predict_proba(selected_test_X)
+
 
             performance_tr_nn /= N_KCV_REPEATS
             performance_te_nn /= N_KCV_REPEATS
@@ -210,6 +280,8 @@ def main():
             performance_te_rf /= N_KCV_REPEATS
             performance_tr_svm /= N_KCV_REPEATS
             performance_te_svm /= N_KCV_REPEATS
+            performance_tr_xgb /= N_KCV_REPEATS
+            performance_te_xgb /= N_KCV_REPEATS
 
             print("\nGenerating confusion matrices for non-deterministic models...")
             cm_nn = eval.confusion_matrix(test_y, last_pred_nn, last_prob_nn.columns)
@@ -221,6 +293,9 @@ def main():
             cm_svm = eval.confusion_matrix(test_y, last_pred_svm, last_prob_svm.columns)
             DataViz.plot_confusion_matrix(cm_svm, last_prob_svm.columns, normalize=False, dataset_name=dataset_name,
                                           method=f'{feature_names[i]}_SVM')
+            cm_xgb = eval.confusion_matrix(test_y, last_pred_xgb, last_prob_xgb.columns)
+            DataViz.plot_confusion_matrix(cm_xgb, last_prob_xgb.columns, normalize=False, dataset_name=dataset_name,
+                                          method=f'{feature_names[i]}_XGB')
 
             print("\nTraining Deterministic Classifiers...")
             print(f"Featureset: {feature_names[i]}")
@@ -248,16 +323,17 @@ def main():
             DataViz.plot_confusion_matrix(cm_nb, c_train_p_nb.columns, normalize=False, dataset_name=dataset_name,
                                           method=f'{feature_names[i]}_NB')
 
+
             scores_with_sd = util.print_table_row_performances(
                 feature_names[i], len(selected_train_X.index), len(selected_test_X.index),
                 [(performance_tr_nn, performance_te_nn), (performance_tr_rf, performance_te_rf),
                  (performance_tr_svm, performance_te_svm),
                  (performance_tr_knn, performance_te_knn), (performance_tr_dt, performance_te_dt),
-                 (performance_tr_nb, performance_te_nb)]
+                 (performance_tr_nb, performance_te_nb), (performance_tr_xgb, performance_te_xgb)],
             )
             scores_over_all_algs.append(scores_with_sd)
 
-        DataViz.plot_performances_classification(['NN', 'RF', 'SVM', 'KNN', 'DT', 'NB'], feature_names,
+        DataViz.plot_performances_classification(['NN', 'RF', 'SVM', 'KNN', 'DT', 'NB', 'XGB'], feature_names,
                                                  scores_over_all_algs, dataset_name)
 
     print(f"\nTotal processing time: {time.time() - start_time} seconds")
