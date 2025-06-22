@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import optuna
 from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
@@ -9,7 +10,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import confusion_matrix, accuracy_score
 import time
 import seaborn as sns
 
@@ -72,110 +73,108 @@ def lstm_classification():
     X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
     y_test_tensor = torch.tensor(y_test, dtype=torch.float32)
 
-    # Create DataLoader
-    batch_size = 32
-    train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    # Define the Optuna objective function
+    def objective(trial):
+        hidden_size = trial.suggest_int("hidden_size", 16, 128)
+        dropout_rate = trial.suggest_float("dropout_rate", 0.1, 0.5)
+        learning_rate = trial.suggest_loguniform("learning_rate", 1e-4, 1e-2)
+        batch_size = trial.suggest_categorical("batch_size", [16, 32, 64])
 
-    # Define LSTM model
-    class LSTMModel(nn.Module):
-        def __init__(self, input_size, hidden_size, output_size):
-            super(LSTMModel, self).__init__()
-            self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
-            self.dropout = nn.Dropout(0.2)
-            self.fc1 = nn.Linear(hidden_size, 32)
-            self.fc2 = nn.Linear(32, output_size)
+        train_loader = DataLoader(TensorDataset(X_train_tensor, y_train_tensor), batch_size=batch_size, shuffle=True)
 
-        def forward(self, x):
-            lstm_out, _ = self.lstm(x)
-            last_hidden_state = lstm_out[:, -1, :]
-            out = self.dropout(last_hidden_state)
-            out = torch.relu(self.fc1(out))
-            # out = torch.softmax(self.fc2(out), dim=1)
-            return out
+        class LSTMModel(nn.Module):
+            def __init__(self, input_size, hidden_size, output_size):
+                super(LSTMModel, self).__init__()
+                self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
+                self.dropout = nn.Dropout(dropout_rate)
+                self.fc1 = nn.Linear(hidden_size, 32)
+                self.fc2 = nn.Linear(32, output_size)
 
-    input_size = X_train.shape[2]
-    hidden_size = 64
-    output_size = y_train.shape[1]
-    model = LSTMModel(input_size, hidden_size, output_size)
+            def forward(self, x):
+                out, _ = self.lstm(x)
+                out = self.dropout(out[:, -1, :])  # Use the last hidden state
+                out = torch.relu(self.fc1(out))
+                out = self.fc2(out)
+                return out
 
-    # Define loss function and optimizer
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+        # Correctly set the input size
+        input_size = X_train_tensor.shape[2]  # Number of features in the input data
+        output_size = y_train_tensor.shape[1]  # Number of target classes
+        model = LSTMModel(input_size, hidden_size, output_size)
 
-    # Initialize lists to store training loss for plotting
-    loss_history = []
 
-    # Training loop with early stopping
-    epochs = 100
-    delta_threshold = 0.0001  # Define the threshold for delta loss
-    previous_loss = float('inf')  # Initialize previous loss to infinity
-    print("Training the model...")
+        criterion = nn.CrossEntropyLoss()
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-    for epoch in tqdm(range(1, epochs + 1), desc="Epoch Progress"):
         model.train()
-        train_loss = 0.0
-        train_accuracy = 0.0
+        for epoch in range(10):  # Fixed number of epochs
+            for X_batch, y_batch in train_loader:
+                # Ensure X_batch has the correct shape (batch_size, sequence_length, input_size)
+                if len(X_batch.shape) == 4:  # If X_batch has an extra dimension
+                    X_batch = X_batch.squeeze(1)  # Remove the extra dimension
+                elif len(X_batch.shape) == 2:  # If X_batch is missing sequence dimension
+                    X_batch = X_batch.unsqueeze(1)  # Add sequence length dimension
 
-        for X_batch, y_batch in train_loader:
-            optimizer.zero_grad()
-            outputs = model(X_batch)
-            loss = criterion(outputs, torch.argmax(y_batch, dim=1))
-            loss.backward()
-            optimizer.step()
+                optimizer.zero_grad()
+                outputs = model(X_batch)
+                loss = criterion(outputs, torch.argmax(y_batch, axis=1))
+                loss.backward()
+                optimizer.step()
 
-            train_loss += loss.item()
-            train_accuracy += (outputs.argmax(dim=1) == y_batch.argmax(dim=1)).sum().item()
+        model.eval()
+        with torch.no_grad():
+            # Initialize X_test_tensor_seq with X_test_tensor as a fallback
+            X_test_tensor_seq = X_test_tensor
 
-        train_loss /= len(train_loader)
-        train_accuracy /= len(train_dataset)
-        loss_history.append(train_loss)  # Store loss for plotting
+            if len(X_test_tensor.shape) == 4:  # If X_test_tensor has an extra dimension
+                X_test_tensor_seq = X_test_tensor.squeeze(1)  # Remove the extra dimension
+            elif len(X_test_tensor.shape) == 2:  # If missing sequence dimension
+                X_test_tensor_seq = X_test_tensor.unsqueeze(1)  # Add sequence length dimension
 
-        print(f"Epoch {epoch}/{epochs} - Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}")
+            y_pred = model(X_test_tensor_seq)
+            y_pred_classes = torch.argmax(y_pred, axis=1)
+            y_true_classes = torch.argmax(y_test_tensor, axis=1)
+            accuracy = accuracy_score(y_true_classes.numpy(), y_pred_classes.numpy())
+            print(f'Trial accuracy: {accuracy:.4f}')
 
-        # Early stopping condition
-        delta_loss = abs(previous_loss - train_loss)
-        if delta_loss < delta_threshold:
-            print(f"Stopping early at epoch {epoch} as delta loss ({delta_loss:.6f}) is below the threshold ({delta_threshold})")
-            break
+        return accuracy
+    
+    # Run Optuna optimization
+    study = optuna.create_study(direction="maximize")
+    study.optimize(objective, n_trials=5)
 
-        previous_loss = train_loss  # Update previous loss for the next epoch
+    print("Best hyperparameters:", study.best_params)
 
-    # Evaluate the model
-    model.eval()
-    with torch.no_grad():
-        outputs = model(X_test_tensor)
-        test_accuracy = (outputs.argmax(dim=1) == y_test_tensor.argmax(dim=1)).sum().item() / len(y_test_tensor)
-        print(f"Test Accuracy: {test_accuracy:.2f}")
 
-        # Generate confusion matrix
-        y_pred = outputs.argmax(dim=1).cpu().numpy()
-        y_true = y_test_tensor.argmax(dim=1).cpu().numpy()
-        cm = confusion_matrix(y_true, y_pred)
 
-        # Save confusion matrix plot with timestamp
-        timestamp = time.strftime("%Y%m%d-%H%M%S")
-        plt.figure(figsize=(8, 6))
-        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=expected_classes, yticklabels=expected_classes)
-        plt.title(f"Confusion Matrix - {timestamp}")
-        plt.xlabel("Predicted Labels")
-        plt.ylabel("True Labels")
-        plt.savefig(f"confusion_matrix_{timestamp}.png")
-        plt.close()
+    #     # Generate confusion matrix
+    #     y_pred = outputs.argmax(dim=1).cpu().numpy()
+    #     y_true = y_test_tensor.argmax(dim=1).cpu().numpy()
+    #     cm = confusion_matrix(y_true, y_pred)
 
-    # Plot training loss
-    #TODO decide if we want to have accuracy in same plot?
-    plt.plot(range(1, len(loss_history) + 1), loss_history, label="Train Loss")
-    plt.xlabel("Epochs")
-    plt.ylabel("Loss")
-    plt.title(f"Training Loss - {timestamp}")
-    plt.legend()
-    plt.savefig(f"training_loss_{timestamp}.png")
-    plt.close()
+    #     # Save confusion matrix plot with timestamp
+    #     timestamp = time.strftime("%Y%m%d-%H%M%S")
+    #     plt.figure(figsize=(8, 6))
+    #     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=expected_classes, yticklabels=expected_classes)
+    #     plt.title(f"Confusion Matrix - {timestamp}")
+    #     plt.xlabel("Predicted Labels")
+    #     plt.ylabel("True Labels")
+    #     plt.savefig(f"confusion_matrix_{timestamp}.png")
+    #     plt.close()
 
-    print(f"Plots saved with timestamp {timestamp}.")
+    # # Plot training loss
+    # #TODO decide if we want to have accuracy in same plot?
+    # plt.plot(range(1, len(loss_history) + 1), loss_history, label="Train Loss")
+    # plt.xlabel("Epochs")
+    # plt.ylabel("Loss")
+    # plt.title(f"Training Loss - {timestamp}")
+    # plt.legend()
+    # plt.savefig(f"training_loss_{timestamp}.png")
+    # plt.close()
+
+    # print(f"Plots saved with timestamp {timestamp}.")
 
 
 if __name__ == "__main__":
-    print("Starting LSTM classification...")
+    print("Starting LSTM classification with Optuna...")
     lstm_classification()
