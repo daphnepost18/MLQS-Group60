@@ -46,9 +46,11 @@ def main():
 
     if not input_files:
         if USE_ALL_FILES:
-            print("No individual Chapter 5 final result files found. Please run bouldering_ch5.py with '--mode final' first.")
+            print(
+                "No individual Chapter 5 final result files found. Please run bouldering_ch5.py with '--mode final' first.")
         else:
-            print(f"Combined file not found at '{combined_file}'. Please run bouldering_ch5.py with '--mode final' and '--source combined'.")
+            print(
+                f"Combined file not found at '{combined_file}'. Please run bouldering_ch5.py with '--mode final' and '--source combined'.")
         return
 
     N_FORWARD_SELECTION = 30
@@ -59,7 +61,7 @@ def main():
         print(f"======================================================\n")
 
         try:
-            dataset = pd.read_csv(input_file_path, index_col=0, nrows=300)
+            dataset = pd.read_csv(input_file_path, index_col=0)
             dataset.index = pd.to_datetime(dataset.index)
         except IOError as e:
             print(f'File not found: {input_file_path.name}. Skipping.')
@@ -202,126 +204,58 @@ def main():
                 performance_te_svm += eval.accuracy(test_y, c_test_y)
                 if repeat == N_KCV_REPEATS - 1: last_pred_svm, last_prob_svm = c_test_y, c_train_p
 
-                # This section is modified to capture the trained models and plot feature importances.
-                performance_tr_nn, performance_te_nn = (0, 0)
-                performance_tr_rf, performance_te_rf = (0, 0)
-                performance_tr_svm, performance_te_svm = (0, 0)
-                last_pred_nn, last_prob_nn = (None, None)
-                last_pred_rf, last_prob_rf = (None, None)
-                last_pred_svm, last_prob_svm = (None, None)
+            performance_tr_nn /= N_KCV_REPEATS
+            performance_te_nn /= N_KCV_REPEATS
+            performance_tr_rf /= N_KCV_REPEATS
+            performance_te_rf /= N_KCV_REPEATS
+            performance_tr_svm /= N_KCV_REPEATS
+            performance_te_svm /= N_KCV_REPEATS
 
-                # NEW: variables to store the last trained models for feature importance plotting
-                last_model_rf = None
-                last_model_dt = None
+            print("\nGenerating confusion matrices for non-deterministic models...")
+            cm_nn = eval.confusion_matrix(test_y, last_pred_nn, last_prob_nn.columns)
+            DataViz.plot_confusion_matrix(cm_nn, last_prob_nn.columns, normalize=False, dataset_name=dataset_name,
+                                          method=f'{feature_names[i]}_NN')
+            cm_rf = eval.confusion_matrix(test_y, last_pred_rf, last_prob_rf.columns)
+            DataViz.plot_confusion_matrix(cm_rf, last_prob_rf.columns, normalize=False, dataset_name=dataset_name,
+                                          method=f'{feature_names[i]}_RF')
+            cm_svm = eval.confusion_matrix(test_y, last_pred_svm, last_prob_svm.columns)
+            DataViz.plot_confusion_matrix(cm_svm, last_prob_svm.columns, normalize=False, dataset_name=dataset_name,
+                                          method=f'{feature_names[i]}_SVM')
 
-                for repeat in range(N_KCV_REPEATS):
-                    print(f"\nRun {repeat + 1}/{N_KCV_REPEATS} for feature set: '{feature_names[i]}'")
-                    print("Training NeuralNetwork...")
-                    c_train_y, c_test_y, c_train_p, _ = learner.feedforward_neural_network(selected_train_X, train_y,
-                                                                                           selected_test_X,
-                                                                                           gridsearch=True)
-                    performance_tr_nn += eval.accuracy(train_y, c_train_y)
-                    performance_te_nn += eval.accuracy(test_y, c_test_y)
-                    if repeat == N_KCV_REPEATS - 1: last_pred_nn, last_prob_nn = c_test_y, c_train_p
+            print("\nTraining Deterministic Classifiers...")
+            print(f"Featureset: {feature_names[i]}")
+            print("Training K-Nearest Neighbor...")
+            c_train_y_knn, c_test_y_knn, c_train_p_knn, _ = learner.k_nearest_neighbor(selected_train_X, train_y,
+                                                                                       selected_test_X, gridsearch=True)
+            performance_tr_knn = eval.accuracy(train_y, c_train_y_knn)
+            performance_te_knn = eval.accuracy(test_y, c_test_y_knn)
+            cm_knn = eval.confusion_matrix(test_y, c_test_y_knn, c_train_p_knn.columns)
+            DataViz.plot_confusion_matrix(cm_knn, c_train_p_knn.columns, normalize=False, dataset_name=dataset_name,
+                                          method=f'{feature_names[i]}_KNN')
+            print("Training Decision Tree...")
+            c_train_y_dt, c_test_y_dt, c_train_p_dt, _ = learner.decision_tree(selected_train_X, train_y,
+                                                                               selected_test_X, gridsearch=True)
+            performance_tr_dt = eval.accuracy(train_y, c_train_y_dt)
+            performance_te_dt = eval.accuracy(test_y, c_test_y_dt)
+            cm_dt = eval.confusion_matrix(test_y, c_test_y_dt, c_train_p_dt.columns)
+            DataViz.plot_confusion_matrix(cm_dt, c_train_p_dt.columns, normalize=False, dataset_name=dataset_name,
+                                          method=f'{feature_names[i]}_DT')
+            print("Training Naive Bayes...")
+            c_train_y_nb, c_test_y_nb, c_train_p_nb, _ = learner.naive_bayes(selected_train_X, train_y, selected_test_X)
+            performance_tr_nb = eval.accuracy(train_y, c_train_y_nb)
+            performance_te_nb = eval.accuracy(test_y, c_test_y_nb)
+            cm_nb = eval.confusion_matrix(test_y, c_test_y_nb, c_train_p_nb.columns)
+            DataViz.plot_confusion_matrix(cm_nb, c_train_p_nb.columns, normalize=False, dataset_name=dataset_name,
+                                          method=f'{feature_names[i]}_NB')
 
-                    print("Training RandomForest...")
-                    # MODIFIED: Capture the returned model object
-                    c_train_y, c_test_y, c_train_p, rf_model = learner.random_forest(selected_train_X, train_y,
-                                                                                     selected_test_X,
-                                                                                     gridsearch=True)
-                    performance_tr_rf += eval.accuracy(train_y, c_train_y)
-                    performance_te_rf += eval.accuracy(test_y, c_test_y)
-                    # MODIFIED: Save the model from the last repeat
-                    if repeat == N_KCV_REPEATS - 1:
-                        last_pred_rf, last_prob_rf, last_model_rf = c_test_y, c_train_p, rf_model
-
-                    print("Training SVM...")
-                    c_train_y, c_test_y, c_train_p, _ = learner.support_vector_machine_with_kernel(selected_train_X,
-                                                                                                   train_y,
-                                                                                                   selected_test_X,
-                                                                                                   gridsearch=True)
-                    performance_tr_svm += eval.accuracy(train_y, c_train_y)
-                    performance_te_svm += eval.accuracy(test_y, c_test_y)
-                    if repeat == N_KCV_REPEATS - 1: last_pred_svm, last_prob_svm = c_test_y, c_train_p
-
-                performance_tr_nn /= N_KCV_REPEATS
-                performance_te_nn /= N_KCV_REPEATS
-                performance_tr_rf /= N_KCV_REPEATS
-                performance_te_rf /= N_KCV_REPEATS
-                performance_tr_svm /= N_KCV_REPEATS
-                performance_te_svm /= N_KCV_REPEATS
-
-                print("\nGenerating confusion matrices for non-deterministic models...")
-                cm_nn = eval.confusion_matrix(test_y, last_pred_nn, last_prob_nn.columns)
-                DataViz.plot_confusion_matrix(cm_nn, last_prob_nn.columns, normalize=False, dataset_name=dataset_name,
-                                              method=f'{feature_names[i]}_NN')
-
-                cm_rf = eval.confusion_matrix(test_y, last_pred_rf, last_prob_rf.columns)
-                DataViz.plot_confusion_matrix(cm_rf, last_prob_rf.columns, normalize=False, dataset_name=dataset_name,
-                                              method=f'{feature_names[i]}_RF')
-
-                if feature_names[i] == 'Selected Features':
-                    print("Generating prediction probability plot for RandomForest...")
-                    DataViz.plot_prediction_probability_distribution(test_y, last_prob_rf, dataset_name=dataset_name,
-                                                                     method='RandomForest')
-
-                cm_svm = eval.confusion_matrix(test_y, last_pred_svm, last_prob_svm.columns)
-                DataViz.plot_confusion_matrix(cm_svm, last_prob_svm.columns, normalize=False, dataset_name=dataset_name,
-                                              method=f'{feature_names[i]}_SVM')
-
-                print("\nTraining Deterministic Classifiers...")
-                print(f"Featureset: {feature_names[i]}")
-
-                print("Training K-Nearest Neighbor...")
-                c_train_y_knn, c_test_y_knn, c_train_p_knn, _ = learner.k_nearest_neighbor(selected_train_X, train_y,
-                                                                                           selected_test_X,
-                                                                                           gridsearch=True)
-                performance_tr_knn = eval.accuracy(train_y, c_train_y_knn)
-                performance_te_knn = eval.accuracy(test_y, c_test_y_knn)
-                cm_knn = eval.confusion_matrix(test_y, c_test_y_knn, c_train_p_knn.columns)
-                DataViz.plot_confusion_matrix(cm_knn, c_train_p_knn.columns, normalize=False, dataset_name=dataset_name,
-                                              method=f'{feature_names[i]}_KNN')
-
-                print("Training Decision Tree...")
-                c_train_y_dt, c_test_y_dt, c_train_p_dt, dt_model = learner.decision_tree(selected_train_X, train_y,
-                                                                                          selected_test_X,
-                                                                                          gridsearch=True)
-                performance_tr_dt = eval.accuracy(train_y, c_train_y_dt)
-                performance_te_dt = eval.accuracy(test_y, c_test_y_dt)
-                cm_dt = eval.confusion_matrix(test_y, c_test_y_dt, c_train_p_dt.columns)
-                DataViz.plot_confusion_matrix(cm_dt, c_train_p_dt.columns, normalize=False, dataset_name=dataset_name,
-                                              method=f'{feature_names[i]}_DT')
-
-                if feature_names[i] == 'Selected Features':
-                    print("Generating prediction probability plot for Decision Tree...")
-                    DataViz.plot_prediction_probability_distribution(test_y, c_train_p_dt, dataset_name=dataset_name,
-                                                                     method='DecisionTree')
-
-                print("Training Naive Bayes...")
-                c_train_y_nb, c_test_y_nb, c_train_p_nb, _ = learner.naive_bayes(selected_train_X, train_y,
-                                                                                 selected_test_X)
-                performance_tr_nb = eval.accuracy(train_y, c_train_y_nb)
-                performance_te_nb = eval.accuracy(test_y, c_test_y_nb)
-                cm_nb = eval.confusion_matrix(test_y, c_test_y_nb, c_train_p_nb.columns)
-                DataViz.plot_confusion_matrix(cm_nb, c_train_p_nb.columns, normalize=False, dataset_name=dataset_name,
-                                              method=f'{feature_names[i]}_NB')
-
-                if feature_names[i] == 'Selected Features':
-                    if last_model_rf:
-                        DataViz.plot_feature_importances(last_model_rf.feature_importances_, current_features,
-                                                         dataset_name, 'RandomForest')
-                    if last_model_dt:
-                        DataViz.plot_feature_importances(last_model_dt.feature_importances_, current_features,
-                                                         dataset_name, 'DecisionTree')
-
-                scores_with_sd = util.print_table_row_performances(
-                    feature_names[i], len(selected_train_X.index), len(selected_test_X.index),
-                    [(performance_tr_nn, performance_te_nn), (performance_tr_rf, performance_te_rf),
-                     (performance_tr_svm, performance_te_svm),
-                     (performance_tr_knn, performance_te_knn), (performance_tr_dt, performance_te_dt),
-                     (performance_tr_nb, performance_te_nb)]
-                )
-                scores_over_all_algs.append(scores_with_sd)
+            scores_with_sd = util.print_table_row_performances(
+                feature_names[i], len(selected_train_X.index), len(selected_test_X.index),
+                [(performance_tr_nn, performance_te_nn), (performance_tr_rf, performance_te_rf),
+                 (performance_tr_svm, performance_te_svm),
+                 (performance_tr_knn, performance_te_knn), (performance_tr_dt, performance_te_dt),
+                 (performance_tr_nb, performance_te_nb)]
+            )
+            scores_over_all_algs.append(scores_with_sd)
 
         DataViz.plot_performances_classification(['NN', 'RF', 'SVM', 'KNN', 'DT', 'NB'], feature_names,
                                                  scores_over_all_algs, dataset_name)
