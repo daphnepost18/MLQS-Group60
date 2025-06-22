@@ -166,6 +166,10 @@ class VisualizeDataset:
         plt.close('all')
 
     def plot_feature_distributions_across_datasets(self, datasets, feature_cols, dataset_labels, main_title=None):
+        """
+        Plots feature distributions for multiple datasets on a grid of subplots,
+        with a single, alphabetically sorted legend for the entire figure.
+        """
         num_features = len(feature_cols)
 
         n_cols = 3
@@ -175,6 +179,9 @@ class VisualizeDataset:
 
         fig, axs = plt.subplots(n_rows, n_cols, figsize=(15 * n_cols / 2, 6 * n_rows), sharex=False)
         axs = axs.flatten() if num_features > 1 else [axs]
+
+        # Dictionary to store unique legend handles (patches) and labels
+        legend_info = {}
 
         for i, feature_col in enumerate(feature_cols):
             ax = axs[i]
@@ -199,24 +206,43 @@ class VisualizeDataset:
                 for j, dataset_df in enumerate(datasets):
                     clean_data = dataset_df[feature_col].dropna()
                     if not clean_data.empty:
-                        ax.hist(clean_data, bins=bins, density=True, alpha=0.5, label=dataset_labels[j],
-                                color=self.colors[j % len(self.colors)])
+                        # The ax.hist returns patches; we use the first for the legend handle
+                        _, _, patches = ax.hist(clean_data, bins=bins, density=True, alpha=0.5, label=dataset_labels[j],
+                                                # This line now uses your class's color list
+                                                color=self.colors[j % len(self.colors)])
+
+                        # Capture the handle and label if not already stored
+                        if dataset_labels[j] not in legend_info:
+                            legend_info[dataset_labels[j]] = patches[0]
 
                 ax.set_title(f'Distribution of {feature_col}')
                 ax.set_xlabel('Value')
                 ax.set_ylabel('Density')
-                ax.legend(fontsize='small')
             else:
                 ax.set_title(f'No data for {feature_col}')
                 ax.set_xlabel('Value')
                 ax.set_ylabel('Density')
 
+        # Hide any unused subplots
         for k in range(num_features, len(axs)):
             fig.delaxes(axs[k])
 
         if main_title:
             fig.suptitle(main_title, fontsize=18)
 
+        # Create a single, sorted legend for the entire figure
+        if legend_info:
+            # Sort the legend items alphabetically by their labels
+            sorted_legend_items = sorted(legend_info.items(), key=lambda item: item[0])
+
+            # Extract the sorted handles and labels
+            sorted_labels = [item[0] for item in sorted_legend_items]
+            sorted_handles = [item[1] for item in sorted_legend_items]
+
+            # Add the single legend to the figure
+            fig.legend(sorted_handles, sorted_labels, loc='lower right', fontsize='medium')
+
+        # Adjust layout to prevent title/legend overlap
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
         file_prefix = "feature_distributions"
@@ -285,6 +311,9 @@ class VisualizeDataset:
                             max_time_this_feature = dataset_df_processed.loc[valid_data.index, 'relative_time_s'].max()
                             max_overall_relative_seconds = max(max_overall_relative_seconds, max_time_this_feature)
 
+        # --- CHANGE 1: Dictionary to store unique legend handles and labels ---
+        legend_info = {}
+
         for i, feature_col in enumerate(feature_cols):
             ax = axs[i]
             if not use_relative_time:
@@ -305,7 +334,13 @@ class VisualizeDataset:
                         else:
                             x_data_for_plot = valid_data_points.index
 
-                        ax.plot(x_data_for_plot, valid_data_points, color=color, linewidth=0.8, label=dataset_labels[j])
+                        # --- CHANGE 2: Capture the plot handle (a Line2D object) ---
+                        lines = ax.plot(x_data_for_plot, valid_data_points, color=color, linewidth=0.8,
+                                        label=dataset_labels[j])
+
+                        # --- CHANGE 3: Store the handle and label if we haven't already ---
+                        if dataset_labels[j] not in legend_info:
+                            legend_info[dataset_labels[j]] = lines[0]
 
                         min_y = min(min_y, valid_data_points.min())
                         max_y = max(max_y, valid_data_points.max())
@@ -327,12 +362,25 @@ class VisualizeDataset:
             else:
                 ax.set_ylim([-1, 1])
 
-            if any(feature_col in d.columns and not d[feature_col].dropna().empty for d in datasets):
-                ax.legend(loc='upper right', fontsize='x-small')
+            # --- CHANGE 4: REMOVE the individual legend calls ---
+            # if any(feature_col in d.columns and not d[feature_col].dropna().empty for d in datasets):
+            #     ax.legend(loc='upper right', fontsize='x-small')
             ax.grid(True, linestyle='--', alpha=0.6)
 
         for k in range(num_features, len(axs)):
             fig.delaxes(axs[k])
+
+        # --- CHANGE 5: Create a single, sorted legend for the entire figure ---
+        if legend_info:
+            # Sort the legend items alphabetically by their labels (the dictionary keys)
+            sorted_legend_items = sorted(legend_info.items(), key=lambda item: item[0])
+
+            # Extract the sorted handles and labels
+            sorted_labels = [item[0] for item in sorted_legend_items]
+            sorted_handles = [item[1] for item in sorted_legend_items]
+
+            # Add the single legend to the figure.
+            fig.legend(sorted_handles, sorted_labels, loc='lower right', fontsize='medium')
 
         fig.text(0.5, 0.04, 'Relative Time (s)' if use_relative_time else 'Time', ha='center', va='center', fontsize=12)
         if main_title:
@@ -342,12 +390,14 @@ class VisualizeDataset:
             for i, ax in enumerate(axs[:num_features]):
                 max_time_for_subplot = 0
                 for j, dataset_df_processed in enumerate(processed_datasets):
-                    feature_col = feature_cols[i]
-                    if feature_col in dataset_df_processed.columns:
-                        valid_data = dataset_df_processed[feature_col].dropna()
-                        if not valid_data.empty:
-                            max_time_this_dataset = dataset_df_processed.loc[valid_data.index, 'relative_time_s'].max()
-                            max_time_for_subplot = max(max_time_for_subplot, max_time_this_dataset)
+                    if i < len(feature_cols):
+                        feature_col = feature_cols[i]
+                        if feature_col in dataset_df_processed.columns:
+                            valid_data = dataset_df_processed[feature_col].dropna()
+                            if not valid_data.empty:
+                                max_time_this_dataset = dataset_df_processed.loc[
+                                    valid_data.index, 'relative_time_s'].max()
+                                max_time_for_subplot = max(max_time_for_subplot, max_time_this_dataset)
 
                 if max_time_for_subplot > 0:
                     ax.set_xlim([0, max_time_for_subplot * 1.05])

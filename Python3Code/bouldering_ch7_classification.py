@@ -46,11 +46,9 @@ def main():
 
     if not input_files:
         if USE_ALL_FILES:
-            print(
-                "No individual Chapter 5 final result files found. Please run bouldering_ch5.py with '--mode final' first.")
+            print("No individual Chapter 5 final result files found. Please run bouldering_ch5.py with '--mode final' first.")
         else:
-            print(
-                f"Combined file not found at '{combined_file}'. Please run bouldering_ch5.py with '--mode final' and '--source combined'.")
+            print(f"Combined file not found at '{combined_file}'. Please run bouldering_ch5.py with '--mode final' and '--source combined'.")
         return
 
     N_FORWARD_SELECTION = 30
@@ -61,7 +59,7 @@ def main():
         print(f"======================================================\n")
 
         try:
-            dataset = pd.read_csv(input_file_path, index_col=0)
+            dataset = pd.read_csv(input_file_path, index_col=0, nrows=300)
             dataset.index = pd.to_datetime(dataset.index)
         except IOError as e:
             print(f'File not found: {input_file_path.name}. Skipping.')
